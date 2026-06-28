@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Student {
+  id                  String           @id @default(uuid())
+  admissionNumber     String           @unique
+  fullName            String
+  gender              String
+  dateOfBirth         DateTime?
+  religion            String?
+  caste               String?
+  fatherName          String
+  motherName          String?
+  mobile1             String
+  mobile2             String?
+  address             String?
+  state               String?
+  country             String           @default("India")
+  className           String
+  previousSchool      String?
+  admissionDate       DateTime         @default(now())
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  isExisting          Boolean          @default(false)
+  joiningYear         Int?
+  previousDue         Int              @default(0)
+  previousDuePaid     Int              @default(0)
+  isFeeExempt         Boolean          @default(false)
+  exemptionReason     String?
+  aadhaarNumber       String?
+  parentAadhaarNumber String?
+  deletedPayments     DeletedPayment[]
+  payments            Payment[]
+}
+
+model FeeStructure {
+  id           String   @id @default(uuid())
+  className    String   @unique
+  monthlyFee   Int
+  admissionFee Int
+  examFee      Int
+  extraFees    Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  vanChargeFee Int      @default(0)
+}
+
+model Payment {
+  id                 String   @id @default(uuid())
+  studentId          String
+  admissionNumber    String
+  month              String   @default("")
+  amount             Int
+  discount           Int      @default(0)
+  paymentMode        String
+  receiptNumber      String   @unique
+  paymentDate        DateTime @default(now())
+  recordedBy         String
+  createdAt          DateTime @default(now())
+  paymentItems       Json
+  isMonthlyPaid      Boolean  @default(false)
+  previousDueCleared Int      @default(0)
+  status             String   @default("SUCCESS")
+  student            Student  @relation(fields: [studentId], references: [id])
+}
+
+model DeletedPayment {
+  id                String   @id @default(uuid())
+  originalPaymentId String
+  studentId         String
+  paymentSnapshot   Json
+  deletedBy         String
+  deletedAt         DateTime @default(now())
+  autoDeleteAt      DateTime
+  student           Student  @relation(fields: [studentId], references: [id])
+}
+
+model SchoolSettings {
+  id              String   @id @default(uuid())
+  schoolName      String
+  logoBase64      String?
+  address         String?
+  contactNumber   String?
+  ownerName       String?
+  upiId           String?
+  bankName        String?
+  accountHolder   String?
+  accountNumber   String?
+  ifscCode        String?
+  branch          String?
+  updatedAt       DateTime @updatedAt
+  nameLastChanged DateTime @default(now())
+}
+
+model SystemSettings {
+  id             String   @id @default(uuid())
+  defaultClasses Json
+  feeTypes       Json
+  updatedAt      DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+model PassoutStudent {
+  id              String   @id @default(uuid())
+  fullName        String
+  className       String
+  contactNumber   String?
+  academicYear    String
+  feesStatus      Status   @default(PENDING)
+  pendingAmount   Int      @default(0)
+  tcTaken         Boolean  @default(false)
+  resultCollected Boolean  @default(false)
+  booksPaid       Boolean  @default(false)
+  uniformPaid     Boolean  @default(false)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([fullName, academicYear])
+}
+
+enum Status {
+  PAID
+  PENDING
+  PARTIAL
+}
