@@ -24,19 +24,20 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 2, borderBottomColor: '#000',
     paddingBottom: 15, marginBottom: 10,
   },
-  logoBox: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
-  logo: { width: 70, height: 70 },
-  schoolInfo: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  logoBox: { width: 100, height: 100, justifyContent: 'center', alignItems: 'center' },
+  logo: { width: 90, height: 90 },
+  schoolInfo: { flex: 1, justifyContent: 'center', paddingLeft: 8 },
   schoolName: {
     fontSize: 22, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase',
-    color: '#1e3a8a', textAlign: 'center', marginBottom: 4,
+    color: '#1e3a8a', textAlign: 'left', marginBottom: 4,
   },
-  address: { fontSize: 10, textAlign: 'center', marginBottom: 4, fontFamily: 'Helvetica-Bold' },
-  emailId: { fontSize: 10, textAlign: 'center', fontFamily: 'Helvetica-Bold', marginTop: 8 },
-  sessionLabel: { marginTop: 6, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#ef4444' },
+  address: { fontSize: 10, textAlign: 'left', marginBottom: 4, fontFamily: 'Helvetica-Bold' },
+  emailId: { fontSize: 10, textAlign: 'left', fontFamily: 'Helvetica-Bold', marginTop: 8 },
+  sessionLabel: { marginTop: 6, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'left' },
 
   receiptTitle: {
     textAlign: 'center', fontSize: 12, fontFamily: 'Helvetica-Bold',

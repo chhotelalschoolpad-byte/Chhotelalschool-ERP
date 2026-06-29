@@ -8,6 +8,7 @@ import StudentModal from "./StudentModal";
 import toast from "react-hot-toast";
 import { useDebounce } from "use-debounce";
 import CustomSelect from "@/components/ui/CustomSelect";
+import ConfirmCodeModal from "@/components/ui/ConfirmCodeModal";
 
 export default function PassoutPage() {
   const [academicYear, setAcademicYear] = useState("all");
@@ -23,6 +24,7 @@ export default function PassoutPage() {
   const [page, setPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [deleteStudentId, setDeleteStudentId] = useState(null);
 
   const limit = 20;
 
@@ -57,10 +59,14 @@ export default function PassoutPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this record?')) return;
+  const handleDelete = (id) => {
+    setDeleteStudentId(id);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteStudentId) return;
     try {
-      const res = await fetch(`/api/passout-students/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/passout-students/${deleteStudentId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       toast.success('Record deleted');
       mutateList();
@@ -192,6 +198,18 @@ export default function PassoutPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         student={editingStudent}
+      />
+
+      <ConfirmCodeModal
+        key={deleteStudentId}
+        isOpen={!!deleteStudentId}
+        onClose={() => setDeleteStudentId(null)}
+        onConfirm={executeDelete}
+        title="Permanently Delete Student Record?"
+        message="This action is completely irreversible. The passout student record will be permanently deleted from the registry."
+        requiredCode="91234"
+        confirmText="Delete Record"
+        isDanger={true}
       />
     </div>
   );

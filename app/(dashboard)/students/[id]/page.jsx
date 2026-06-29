@@ -694,7 +694,7 @@ export default function StudentProfile() {
                 ))}
               </div>
               <p className="text-[9px] text-gray-400 mt-4 leading-relaxed italic">
-                Shared Father Name or Aadhaar detected. Sibling policy allows for one student to be exempted.
+                Shared Parent&apos;s Aadhaar or Contact Number detected. Sibling policy allows for one student to be exempted.
               </p>
             </div>
           )}

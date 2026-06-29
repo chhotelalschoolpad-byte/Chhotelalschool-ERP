@@ -5,6 +5,7 @@ import { useStudents, useLateStudents } from '@/hooks/useStudents';
 import { useSchoolSettings } from '@/hooks/useSettings';
 import useSWR from 'swr';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Users, IndianRupee, AlertCircle, Settings2, Settings, UserPlus, BarChart3, Eye, Smartphone } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import {
@@ -22,6 +23,7 @@ const fmt = (amt) =>
   }).format(amt || 0);
 
 export default function Dashboard() {
+  const router = useRouter();
   const { total } = useStudents('?limit=1');
   const { students: lateStudents, isLoading: isLateLoading } = useLateStudents();
   
@@ -242,7 +244,11 @@ export default function Dashboard() {
                 </tr>
               ) : (
                 paginatedLateStudents?.map((student) => (
-                  <tr key={student.id} className="hover:bg-gray-50/50 transition-colors border-b border-gray-100 last:border-0">
+                  <tr
+                    key={student.id}
+                    onClick={() => router.push(`/students/${student.id}`)}
+                    className="cursor-pointer hover:bg-gray-50/50 transition-colors border-b border-gray-100 last:border-0"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div className="h-10 w-10 shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold uppercase text-sm">
@@ -267,7 +273,7 @@ export default function Dashboard() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" onClick={(e) => e.stopPropagation()}>
                       <Link href={`/students/${student.id}`} className="text-gray-400 hover:text-blue-600 transition-colors bg-gray-50 hover:bg-blue-50 p-2 rounded-lg inline-flex" title="View Profile">
                         <Eye size={18} />
                       </Link>

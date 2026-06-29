@@ -2,7 +2,8 @@ import { prisma } from '../lib/prisma';
 import * as XLSX from 'xlsx';
 
 export async function getDailyReport(dateStr, sessionYear) {
-  const date = new Date(dateStr);
+  const dateVal = dateStr || new Date().toISOString().slice(0, 10);
+  const date = new Date(dateVal);
   const startOfDay = new Date(date.setHours(0, 0, 0, 0));
   const endOfDay = new Date(date.setHours(23, 59, 59, 999));
 
@@ -43,7 +44,8 @@ export async function getDailyReport(dateStr, sessionYear) {
 
 export async function getMonthlyReport(monthStr, sessionYear) {
   // monthStr looks like "2024-03"
-  const [year, month] = monthStr.split('-');
+  const monthVal = monthStr || new Date().toISOString().slice(0, 7);
+  const [year, month] = monthVal.split('-');
   const startOfMonth = new Date(year, parseInt(month) - 1, 1);
   const endOfMonth = new Date(year, parseInt(month), 0, 23, 59, 59, 999);
 
@@ -198,39 +200,87 @@ export async function exportReportBuffer(type, dateStr, sessionYear) {
   let data = [];
   if (type === 'daily') {
     const res = await getDailyReport(dateStr, sessionYear);
-    data = res.payments.map(p => ({
-      Date: p.paymentDate.toLocaleDateString('en-IN'),
-      Receipt: p.receiptNumber,
-      Student: p.student?.fullName,
-      Class: p.student?.className,
-      AdmissionNo: p.admissionNumber,
-      Mode: p.paymentMode,
-      Type: p.feeType,
-      Amount: p.amount - p.discount
-    }));
+    if (res.payments && res.payments.length > 0) {
+      data = res.payments.map(p => ({
+        Date: p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+        Receipt: p.receiptNumber,
+        Student: p.student?.fullName || '',
+        Class: p.student?.className || '',
+        AdmissionNo: p.admissionNumber,
+        Mode: p.paymentMode,
+        Type: p.feeType || '',
+        Total: p.amount || 0,
+        "Discount Given": p.discount || 0,
+        "Amount Paid": p.amount - p.discount
+      }));
+
+      const totalOriginal = res.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalDiscount = res.payments.reduce((sum, p) => sum + (p.discount || 0), 0);
+      const totalAmountPaid = res.payments.reduce((sum, p) => sum + (p.amount - (p.discount || 0)), 0);
+      data.push({
+        Date: 'TOTAL',
+        Receipt: '',
+        Student: '',
+        Class: '',
+        AdmissionNo: '',
+        Mode: '',
+        Type: '',
+        Total: totalOriginal,
+        "Discount Given": totalDiscount,
+        "Amount Paid": totalAmountPaid
+      });
+    } else {
+      data = [{ Date: 'No Records', Receipt: '', Student: '', Class: '', AdmissionNo: '', Mode: '', Type: '', Total: 0, "Discount Given": 0, "Amount Paid": 0 }];
+    }
   } else if (type === 'monthly') {
     const res = await getMonthlyReport(dateStr, sessionYear);
-    data = res.payments.map(p => ({
-      Date: p.paymentDate.toLocaleDateString('en-IN'),
-      Receipt: p.receiptNumber,
-      Student: p.student?.fullName,
-      Class: p.student?.className,
-      AdmissionNo: p.admissionNumber,
-      Mode: p.paymentMode,
-      Type: p.feeType,
-      Amount: p.amount - p.discount
-    }));
+    if (res.payments && res.payments.length > 0) {
+      data = res.payments.map(p => ({
+        Date: p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+        Receipt: p.receiptNumber,
+        Student: p.student?.fullName || '',
+        Class: p.student?.className || '',
+        AdmissionNo: p.admissionNumber,
+        Mode: p.paymentMode,
+        Type: p.feeType || '',
+        Total: p.amount || 0,
+        "Discount Given": p.discount || 0,
+        "Amount Paid": p.amount - p.discount
+      }));
+
+      const totalOriginal = res.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const totalDiscount = res.payments.reduce((sum, p) => sum + (p.discount || 0), 0);
+      const totalAmountPaid = res.payments.reduce((sum, p) => sum + (p.amount - (p.discount || 0)), 0);
+      data.push({
+        Date: 'TOTAL',
+        Receipt: '',
+        Student: '',
+        Class: '',
+        AdmissionNo: '',
+        Mode: '',
+        Type: '',
+        Total: totalOriginal,
+        "Discount Given": totalDiscount,
+        "Amount Paid": totalAmountPaid
+      });
+    } else {
+      data = [{ Date: 'No Records', Receipt: '', Student: '', Class: '', AdmissionNo: '', Mode: '', Type: '', Total: 0, "Discount Given": 0, "Amount Paid": 0 }];
+    }
   } else if (type === 'pending') {
     const res = await getPendingReport(sessionYear);
-    data = res.students.map(s => ({
-      Student:     s.fullName,
-      Class:       s.className,
-      AdmissionNo: s.admissionNumber,
-      Mobile:      s.mobile1,
-      Status:      s.isMonthlyPending ? 'Monthly Pending' : 'Paid',
-      LegacyDueBadge: s.hasLegacyDue ? 'Has Legacy Dues' : '-',
-      PreviousDue: s.previousDue ?? 0,
-    }));
+    if (res.students && res.students.length > 0) {
+      data = res.students.map(s => ({
+        Student:     s.fullName || '',
+        Class:       s.className || '',
+        AdmissionNo: s.admissionNumber || '',
+        Mobile:      s.mobile1 || '',
+        Status:      s.isMonthlyPending ? 'Monthly Pending' : 'Paid',
+        LegacyDueBadge: s.hasLegacyDue ? 'Has Legacy Dues' : '-',
+        PreviousDue: s.previousDue ?? 0,
+      }));
+    } else {
+      data = [{ Student: 'No Records', Class: '', AdmissionNo: '', Mobile: '', Status: '', LegacyDueBadge: '', PreviousDue: 0 }];
+    }
   }
 
   const worksheet = XLSX.utils.json_to_sheet(data);

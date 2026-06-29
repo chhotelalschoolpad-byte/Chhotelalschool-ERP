@@ -8,6 +8,7 @@ import { PDFDownloadLink } from "@react-pdf/renderer";
 import ReceiptPDF from "@/components/pdf/ReceiptPDF";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import DatePicker from '@/components/ui/DatePicker';
+import { useRouter } from 'next/navigation';
 
 function formatMonthLabel(ym) {
   if (!ym) return "N/A";
@@ -18,6 +19,7 @@ function formatMonthLabel(ym) {
 const fetcher = url => fetch(url).then(r => r.json());
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('daily');
   const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10));
   const [monthStr, setMonthStr] = useState(new Date().toISOString().slice(0, 7));
@@ -208,7 +210,9 @@ export default function ReportsPage() {
                         <th className="px-4 py-3">Student</th>
                         <th className="px-4 py-3">Date</th>
                         <th className="px-4 py-3">Target</th>
-                        <th className="px-4 py-3">Amount</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-right">Discount Given</th>
+                        <th className="px-4 py-3 text-right">Amount Paid</th>
                         <th className="px-4 py-3 text-center">Action</th>
                       </tr>
                     ) : (
@@ -223,16 +227,22 @@ export default function ReportsPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {activeTab !== 'pending' && reportData?.payments?.length === 0 ? (
-                      <tr><td colSpan="5" className="text-center py-10 text-gray-500"><Receipt className="mx-auto mb-2 text-gray-300" size={32} />No collections found for this period.</td></tr>
+                      <tr><td colSpan="8" className="text-center py-10 text-gray-500"><Receipt className="mx-auto mb-2 text-gray-300" size={32} />No collections found for this period.</td></tr>
                     ) : activeTab !== 'pending' ? (
                       paginatedPayments?.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                        <tr
+                          key={p.id}
+                          onClick={() => router.push(`/students/${p.student?.id}`)}
+                          className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                        >
                           <td className="px-4 py-1.5 font-mono text-[11px] text-gray-400 tracking-tighter">{p.receiptNumber}</td>
                           <td className="px-4 py-1.5 font-bold text-gray-900">{p.student?.fullName}</td>
                           <td className="px-4 py-1.5 text-gray-400 text-[11px]">{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
                           <td className="px-4 py-1.5 font-medium text-blue-600/70 text-[11px] uppercase">{formatMonthLabel(p.month)}</td>
+                          <td className="px-4 py-1.5 text-gray-600 font-medium text-right whitespace-nowrap">{formatIN(p.amount)}</td>
+                          <td className="px-4 py-1.5 text-amber-600 font-medium text-right whitespace-nowrap">{p.discount > 0 ? formatIN(p.discount) : '-'}</td>
                           <td className="px-4 py-1.5 text-emerald-600 font-medium text-right whitespace-nowrap">+{formatIN(p.amount - p.discount)}</td>
-                          <td className="px-4 py-1.5 text-center">
+                          <td className="px-4 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                              <PDFDownloadLink document={<ReceiptPDF payment={p} student={p.student} settings={settings} />} fileName={`Receipt_${p.receiptNumber}.pdf`}>
                                <button className="h-7 w-7 bg-gray-50 hover:bg-blue-600 hover:text-white rounded-lg text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm mx-auto">
                                  <Download size={14} />
@@ -245,7 +255,11 @@ export default function ReportsPage() {
                       <tr><td colSpan="5" className="text-center py-10 text-gray-500"><PieChart className="mx-auto mb-2 text-green-300" size={32} />No pending fees. Everything is clear!</td></tr>
                     ) : (
                       paginatedStudents?.map(s => (
-                        <tr key={s.id} className="hover:bg-gray-100/30 transition-colors">
+                        <tr
+                          key={s.id}
+                          onClick={() => router.push(`/students/${s.id}`)}
+                          className="cursor-pointer hover:bg-gray-100/30 transition-colors"
+                        >
                           <td className="px-4 py-1.5 font-bold text-gray-800">{s.fullName}</td>
                           <td className="px-4 py-1.5 font-mono text-[11px] text-gray-500">{s.admissionNumber}</td>
                           <td className="px-4 py-1.5 text-gray-600">{s.className}</td>

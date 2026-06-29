@@ -10,10 +10,9 @@ export async function GET(req, { params }) {
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       select: {
-        fatherName: true,
-        motherName: true,
-        aadhaarNumber: true,
-        parentAadhaarNumber: true
+        parentAadhaarNumber: true,
+        mobile1: true,
+        mobile2: true
       }
     });
 
@@ -22,20 +21,21 @@ export async function GET(req, { params }) {
     // Build the "OR" query for siblings
     const siblingCriteria = [];
     
-    if (student.fatherName) {
-      siblingCriteria.push({ fatherName: { equals: student.fatherName, mode: 'insensitive' } });
+    const parentAadhaar = student.parentAadhaarNumber?.trim();
+    if (parentAadhaar) {
+      siblingCriteria.push({ parentAadhaarNumber: parentAadhaar });
     }
     
-    if (student.motherName) {
-      siblingCriteria.push({ motherName: { equals: student.motherName, mode: 'insensitive' } });
+    const mobile1 = student.mobile1?.trim();
+    if (mobile1) {
+      siblingCriteria.push({ mobile1: mobile1 });
+      siblingCriteria.push({ mobile2: mobile1 });
     }
     
-    if (student.aadhaarNumber) {
-      siblingCriteria.push({ aadhaarNumber: student.aadhaarNumber });
-    }
-    
-    if (student.parentAadhaarNumber) {
-      siblingCriteria.push({ parentAadhaarNumber: student.parentAadhaarNumber });
+    const mobile2 = student.mobile2?.trim();
+    if (mobile2) {
+      siblingCriteria.push({ mobile1: mobile2 });
+      siblingCriteria.push({ mobile2: mobile2 });
     }
 
     if (siblingCriteria.length === 0) {

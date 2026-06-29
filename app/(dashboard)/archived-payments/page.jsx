@@ -5,14 +5,15 @@ import useSWR from 'swr';
 import { ArchiveX, Download, ArrowLeft, ArrowRight, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import ConfirmModal from '@/components/ui/ConfirmModal';
+import ConfirmCodeModal from '@/components/ui/ConfirmCodeModal';
 
 const fetcher = url => fetch(url).then(r => r.json());
 
 export default function ArchivedPaymentsPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const { data, error, isLoading, mutate } = useSWR(`/api/payments/deleted?page=${page}&limit=${limit}`, fetcher, {
     keepPreviousData: true
@@ -62,21 +63,21 @@ export default function ArchivedPaymentsPage() {
     }
   };
 
-  const handleDeletePermanent = async () => {
-    if (!deleteConfirmId) return;
+  const handleDeleteAll = async () => {
     try {
-      const res = await fetch(`/api/payments/deleted/${deleteConfirmId}`, { method: 'DELETE' });
+      setDeleting(true);
+      const res = await fetch(`/api/payments/deleted`, { method: 'DELETE' });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to delete record');
+        throw new Error(errorData.error || 'Failed to delete records');
       }
-      toast.success("Archived payment deleted permanently.");
+      toast.success("All archived payments deleted permanently.");
       mutate();
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Failed to delete archived payment.");
+      toast.error(err.message || "Failed to delete archived payments.");
     } finally {
-      setDeleteConfirmId(null);
+      setDeleting(false);
     }
   };
 
@@ -96,18 +97,32 @@ export default function ArchivedPaymentsPage() {
           <p className="text-sm text-gray-500 mt-1">Audit log of intentionally deleted payment receipts.</p>
         </div>
         
-        <button
-          onClick={handleExportAll}
-          disabled={exporting || (payments.length === 0 && !isLoading)}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center disabled:opacity-50"
-        >
-          {exporting ? (
-            <span className="w-4 h-4 mr-2 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-          ) : (
-            <Download className="w-4 h-4 mr-2" />
-          )}
-          {exporting ? 'Compiling...' : 'Export All to Excel'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDeleteAllModal(true)}
+            disabled={deleting || payments.length === 0}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center justify-center disabled:opacity-50 shadow-lg shadow-red-200"
+          >
+            {deleting ? (
+              <span className="w-4 h-4 mr-2 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
+            )}
+            {deleting ? 'Deleting...' : 'Delete All'}
+          </button>
+          <button
+            onClick={handleExportAll}
+            disabled={exporting || (payments.length === 0 && !isLoading)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center disabled:opacity-50 shadow-lg shadow-green-200"
+          >
+            {exporting ? (
+              <span className="w-4 h-4 mr-2 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            {exporting ? 'Compiling...' : 'Export All to Excel'}
+          </button>
+        </div>
       </div>
 
       {/* Auto-Purge banner removed */}
@@ -121,13 +136,12 @@ export default function ArchivedPaymentsPage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Student</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Deleted By</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isLoading && payments.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
                     <div className="flex justify-center items-center space-x-2">
                        <span className="w-5 h-5 border-2 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></span>
                        <span>Loading records...</span>
@@ -136,7 +150,7 @@ export default function ArchivedPaymentsPage() {
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
                     <div className="flex justify-center items-center space-x-2">
                       <ArchiveX className="w-5 h-5 text-gray-400" />
                       <span>No archived payments found.</span>
@@ -162,15 +176,6 @@ export default function ArchivedPaymentsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-xs text-gray-900">By: <span className="font-semibold">{log.deletedBy}</span></div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => setDeleteConfirmId(log.id)}
-                          className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-2 rounded-lg inline-flex items-center justify-center transition-colors"
-                          title="Permanently Delete Record"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </td>
                     </tr>
                   );
@@ -206,13 +211,15 @@ export default function ArchivedPaymentsPage() {
         )}
       </div>
 
-      <ConfirmModal
-        isOpen={!!deleteConfirmId}
-        onClose={() => setDeleteConfirmId(null)}
-        onConfirm={handleDeletePermanent}
-        title="Permanently Delete Record?"
-        message="This action is irreversible. The archived payment record will be permanently deleted from the database."
-        confirmText="Delete Permanently"
+      <ConfirmCodeModal
+        key={showDeleteAllModal}
+        isOpen={showDeleteAllModal}
+        onClose={() => setShowDeleteAllModal(false)}
+        onConfirm={handleDeleteAll}
+        title="Permanently Delete All Archived Payments?"
+        message="This action is completely irreversible. All archived payment records will be permanently deleted from the database."
+        requiredCode="91234"
+        confirmText="Delete All Permanently"
         isDanger={true}
       />
     </div>
