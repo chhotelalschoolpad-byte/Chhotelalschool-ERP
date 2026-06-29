@@ -30,14 +30,14 @@ const styles = StyleSheet.create({
   },
   logoBox: { width: 115, height: 115, justifyContent: 'center', alignItems: 'center' },
   logo: { width: 105, height: 105 },
-  schoolInfo: { flex: 1, justifyContent: 'center', paddingRight: 10 },
+  schoolInfo: { flex: 1, justifyContent: 'center', paddingLeft: 8 },
   schoolName: {
     fontSize: 26, fontFamily: 'Times-Bold', textTransform: 'uppercase',
-    color: '#800000', textAlign: 'right', marginBottom: 4,
+    color: '#800000', textAlign: 'left', marginBottom: 4,
   },
-  address: { fontSize: 10, textAlign: 'right', marginBottom: 4, fontFamily: 'Helvetica' },
-  emailId: { fontSize: 10, textAlign: 'right', fontFamily: 'Helvetica', marginTop: 8 },
-  sessionLabel: { marginTop: 6, fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'right' },
+  address: { fontSize: 10, textAlign: 'left', marginBottom: 4, fontFamily: 'Helvetica' },
+  emailId: { fontSize: 10, textAlign: 'left', fontFamily: 'Helvetica', marginTop: 8 },
+  sessionLabel: { marginTop: 6, fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'left' },
  
   receiptTitle: {
     textAlign: 'center', fontSize: 13, fontFamily: 'Helvetica-Bold',
@@ -234,13 +234,13 @@ export default function ReceiptPDF({ payment, student, settings }) {
           <View style={styles.innerPageBorder}>
             
             <View style={styles.header}>
+              <View style={styles.logoBox}><Image src={logo} style={styles.logo} /></View>
               <View style={styles.schoolInfo}>
                 <Text style={styles.schoolName}>{schoolName}</Text>
                 <Text style={styles.address}>{schoolAddress}</Text>
                 <Text style={styles.emailId}>E-mail Id :- chhotelalpublicjuniorschoolpad@gmail.com</Text>
                 <Text style={styles.sessionLabel}>SESSION : ({sessionStr})</Text>
               </View>
-              <View style={styles.logoBox}><Image src={logo} style={styles.logo} /></View>
             </View>
 
             <Text style={styles.receiptTitle}>Fee Receipt({sessionStr})</Text>
