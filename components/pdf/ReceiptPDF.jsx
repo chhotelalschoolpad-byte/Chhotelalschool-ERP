@@ -1,8 +1,16 @@
 "use client"
 
 import {
-  Document, Page, Text, View, StyleSheet, Image,
+  Document, Page, Text, View, StyleSheet, Image, Font,
 } from '@react-pdf/renderer';
+
+Font.register({
+  family: 'Baskerville',
+  fonts: [
+    { src: '/fonts/LibreBaskerville-Regular.ttf' },
+    { src: '/fonts/LibreBaskerville-Bold.ttf', fontWeight: 'bold' }
+  ]
+});
 
 const styles = StyleSheet.create({
   page: {
@@ -32,7 +40,7 @@ const styles = StyleSheet.create({
   logo: { width: 90, height: 90 },
   schoolInfo: { flex: 1, justifyContent: 'center', paddingLeft: 8 },
   schoolName: {
-    fontSize: 22, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase',
+    fontSize: 22, fontFamily: 'Baskerville', fontWeight: 'bold', textTransform: 'uppercase',
     color: '#1e3a8a', textAlign: 'left', marginBottom: 4,
   },
   address: { fontSize: 10, textAlign: 'left', marginBottom: 4, fontFamily: 'Helvetica-Bold' },
