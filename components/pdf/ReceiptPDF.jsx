@@ -30,14 +30,14 @@ const styles = StyleSheet.create({
   },
   logoBox: { width: 115, height: 115, justifyContent: 'center', alignItems: 'center' },
   logo: { width: 105, height: 105 },
-  schoolInfo: { flex: 1, justifyContent: 'center' },
+  schoolInfo: { flex: 1, justifyContent: 'center', paddingRight: 10 },
   schoolName: {
-    fontSize: 24, fontFamily: 'Times-Bold', textTransform: 'uppercase',
-    color: '#1e3a8a', textAlign: 'center', marginBottom: 4,
+    fontSize: 26, fontFamily: 'Times-Bold', textTransform: 'uppercase',
+    color: '#800000', textAlign: 'right', marginBottom: 4,
   },
-  address: { fontSize: 9, textAlign: 'center', marginBottom: 4, fontFamily: 'Helvetica' },
-  emailId: { fontSize: 9, textAlign: 'center', fontFamily: 'Helvetica', marginTop: 8 },
-  sessionLabel: { marginTop: 6, fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'center' },
+  address: { fontSize: 10, textAlign: 'right', marginBottom: 4, fontFamily: 'Helvetica' },
+  emailId: { fontSize: 10, textAlign: 'right', fontFamily: 'Helvetica', marginTop: 8 },
+  sessionLabel: { marginTop: 6, fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'right' },
  
   receiptTitle: {
     textAlign: 'center', fontSize: 13, fontFamily: 'Helvetica-Bold',
