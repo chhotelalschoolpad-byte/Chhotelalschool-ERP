@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { ZipArchive } from 'archiver';
 import { execFile } from 'child_process';
 import util from 'util';
@@ -128,7 +129,7 @@ async function runBackupGeneration() {
   const timestampStr = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
   const zipFilename = `ChhotelalSchool_Backup_${timestampStr}.zip`;
 
-  const tempDir = path.join(process.cwd(), 'tmp');
+  const tempDir = os.tmpdir();
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
