@@ -28,16 +28,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#000',
     paddingBottom: 15, marginBottom: 10,
   },
-  logoBox: { width: 115, height: 115, justifyContent: 'center', alignItems: 'center' },
-  logo: { width: 105, height: 105 },
-  schoolInfo: { flex: 1, justifyContent: 'center', paddingLeft: 8 },
+  logoBox: { width: 125, height: 125, justifyContent: 'center', alignItems: 'center' },
+  logo: { width: 115, height: 115 },
+  schoolInfo: { flex: 1, justifyContent: 'center', paddingLeft: 4 },
   schoolName: {
-    fontSize: 26, fontFamily: 'Times-Bold', textTransform: 'uppercase',
+    fontSize: 28, fontFamily: 'Times-Bold', textTransform: 'uppercase',
     color: '#800000', textAlign: 'left', marginBottom: 4,
   },
-  address: { fontSize: 10, textAlign: 'left', marginBottom: 4, fontFamily: 'Helvetica' },
-  emailId: { fontSize: 10, textAlign: 'left', fontFamily: 'Helvetica', marginTop: 8 },
-  sessionLabel: { marginTop: 6, fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'left' },
+  address: { fontSize: 11, textAlign: 'left', marginBottom: 4, fontFamily: 'Helvetica' },
+  emailId: { fontSize: 10.5, textAlign: 'left', fontFamily: 'Helvetica', marginTop: 8 },
+  sessionLabel: { marginTop: 6, fontSize: 13, fontFamily: 'Helvetica-Bold', color: '#ef4444', textAlign: 'left' },
  
   receiptTitle: {
     textAlign: 'center', fontSize: 13, fontFamily: 'Helvetica-Bold',
