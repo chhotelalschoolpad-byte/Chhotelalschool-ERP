@@ -5,6 +5,7 @@ import { Plus, Search, FileDown, Database } from "lucide-react";
 import StatsGrid from "./StatsGrid";
 import StudentTable from "./StudentTable";
 import StudentModal from "./StudentModal";
+import StudentProfileModal from "./StudentProfileModal";
 import toast from "react-hot-toast";
 import { useDebounce } from "use-debounce";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -25,6 +26,10 @@ export default function PassoutPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [deleteStudentId, setDeleteStudentId] = useState(null);
+
+  // Profile modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileStudent, setProfileStudent] = useState(null);
 
   const limit = 20;
 
@@ -79,6 +84,11 @@ export default function PassoutPage() {
   const handleExport = (format) => {
     const exportUrl = `/api/passout-students/export?format=${format}&academicYear=${academicYear}&className=${className}&search=${debouncedSearch}&filter=${activeFilter}&tcTaken=${tcFilter}&resultCollected=${resultFilter}&booksPaid=${booksFilter}&uniformPaid=${uniformFilter}`;
     window.location.href = exportUrl;
+  };
+
+  const handleRowClick = (student) => {
+    setProfileStudent(student);
+    setIsProfileModalOpen(true);
   };
 
   const academicYears = (() => {
@@ -191,6 +201,7 @@ export default function PassoutPage() {
           setIsModalOpen(true);
         }}
         onDelete={handleDelete}
+        onRowClick={handleRowClick}
       />
 
       <StudentModal 
@@ -198,6 +209,15 @@ export default function PassoutPage() {
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
         student={editingStudent}
+      />
+
+      <StudentProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setProfileStudent(null);
+        }}
+        student={profileStudent}
       />
 
       <ConfirmCodeModal

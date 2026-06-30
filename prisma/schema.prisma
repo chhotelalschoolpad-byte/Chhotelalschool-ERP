@@ -135,6 +135,9 @@ model PassoutStudent {
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  fatherName      String?
+  motherName      String?
+  address         String?
 
   @@index([fullName, academicYear])
 }

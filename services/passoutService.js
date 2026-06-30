@@ -76,6 +76,9 @@ export async function exportPassoutExcel(filters) {
   const data = students.map(s => ({
     Name: s.fullName,
     Class: s.className,
+    'Father Name': s.fatherName || '-',
+    'Mother Name': s.motherName || '-',
+    Address: s.address || '-',
     Contact: s.contactNumber || '-',
     'Academic Year': s.academicYear,
     'Fees Status': s.feesStatus,
@@ -93,8 +96,8 @@ export async function exportPassoutExcel(filters) {
   
   // Set column widths
   const wscols = [
-    {wch: 25}, {wch: 10}, {wch: 15}, {wch: 15}, {wch: 12}, 
-    {wch: 15}, {wch: 10}, {wch: 15}, {wch: 12}, {wch: 12}, {wch: 30}
+    {wch: 25}, {wch: 10}, {wch: 20}, {wch: 20}, {wch: 30}, {wch: 15}, 
+    {wch: 15}, {wch: 12}, {wch: 15}, {wch: 10}, {wch: 15}, {wch: 12}, {wch: 12}, {wch: 30}
   ];
   worksheet['!cols'] = wscols;
 

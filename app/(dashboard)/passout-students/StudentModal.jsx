@@ -15,14 +15,22 @@ export default function StudentModal({ isOpen, onClose, onSave, student }) {
     resultCollected: false,
     booksPaid: false,
     uniformPaid: false,
-    notes: ""
+    notes: "",
+    fatherName: "",
+    motherName: "",
+    address: ""
   });
 
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (student) {
-      setFormData(student);
+      setFormData({
+        ...student,
+        fatherName: student.fatherName || "",
+        motherName: student.motherName || "",
+        address: student.address || ""
+      });
     } else {
       setFormData({
         fullName: "",
@@ -35,7 +43,10 @@ export default function StudentModal({ isOpen, onClose, onSave, student }) {
         resultCollected: false,
         booksPaid: false,
         uniformPaid: false,
-        notes: ""
+        notes: "",
+        fatherName: "",
+        motherName: "",
+        address: ""
       });
     }
     setErrors({});
@@ -125,6 +136,39 @@ export default function StudentModal({ isOpen, onClose, onSave, student }) {
                 onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
               />
             </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Father's Name (Optional)</label>
+              <input
+                type="text"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="Father's Name"
+                value={formData.fatherName || ''}
+                onChange={(e) => setFormData({ ...formData, fatherName: capitalize(e.target.value) })}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Mother's Name (Optional)</label>
+              <input
+                type="text"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="Mother's Name"
+                value={formData.motherName || ''}
+                onChange={(e) => setFormData({ ...formData, motherName: capitalize(e.target.value) })}
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Address (Optional)</label>
+              <input
+                type="text"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
+                placeholder="Student's Address"
+                value={formData.address || ''}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              />
+            </div>
           </div>
 
           <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-6">
@@ -177,16 +221,6 @@ export default function StudentModal({ isOpen, onClose, onSave, student }) {
                 </label>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Notes / Remarks</label>
-            <textarea
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 h-24"
-              placeholder="Any additional details..."
-              value={formData.notes || ''}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            />
           </div>
 
           <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">

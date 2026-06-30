@@ -209,7 +209,6 @@ export default function PassoutListPDF({ students, filters, settings }) {
                 <Text style={[styles.th, styles.colName]}>Full Student Name</Text>
                 <Text style={[styles.th, styles.colClass]}>Class</Text>
                 <Text style={[styles.th, styles.colYear]}>Session</Text>
-                <Text style={[styles.th, styles.colPhone]}>Contact</Text>
                 <Text style={[styles.th, styles.colStatus]}>Fees Status</Text>
                 <Text style={[styles.th, styles.colPending]}>Pending</Text>
                 <Text style={[styles.th, styles.colFlagFull]}>TC Taken</Text>
@@ -221,10 +220,18 @@ export default function PassoutListPDF({ students, filters, settings }) {
               {students.map((item, i) => (
                 <View key={i} style={styles.tr}>
                   <Text style={[styles.td, styles.colSno]}>{i + 1}</Text>
-                  <Text style={[styles.td, styles.colName, { fontFamily: 'Helvetica-Bold' }]}>{item.fullName.toUpperCase()}</Text>
+                  <View style={[styles.td, styles.colName, { alignItems: 'flex-start', justifyContent: 'center' }]}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: 9 }}>{item.fullName.toUpperCase()}</Text>
+                    {(item.fatherName || item.address) && (
+                      <Text style={{ fontFamily: 'Helvetica', fontSize: 6.5, color: '#4b5563', marginTop: 2 }}>
+                        {item.fatherName ? `Father: ${item.fatherName}` : ''}
+                        {item.fatherName && item.address ? ' | ' : ''}
+                        {item.address ? `Address: ${item.address}` : ''}
+                      </Text>
+                    )}
+                  </View>
                   <Text style={[styles.td, styles.colClass]}>{item.className}</Text>
                   <Text style={[styles.td, styles.colYear]}>{item.academicYear}</Text>
-                  <Text style={[styles.td, styles.colPhone]}>{item.contactNumber || '—'}</Text>
                   <Text style={[styles.td, styles.colStatus, { color: item.feesStatus === 'PAID' ? '#10b981' : '#ef4444', fontFamily: 'Helvetica-Bold' }]}>{item.feesStatus}</Text>
                   <Text style={[styles.td, styles.colPending, { fontFamily: 'Helvetica-Bold' }]}>{item.feesStatus === 'PAID' ? '0' : (item.pendingAmount > 0 ? item.pendingAmount : '0')}</Text>
                   <View style={[styles.td, styles.colFlagFull]}><StatusIcon condition={item.tcTaken} /></View>

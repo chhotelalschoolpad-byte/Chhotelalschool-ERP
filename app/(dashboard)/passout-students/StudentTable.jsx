@@ -2,7 +2,7 @@
 import { Edit2, Trash2, CheckCircle2, XCircle } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 
-export default function StudentTable({ students, isLoading, page, setPage, total, limit, onEdit, onDelete }) {
+export default function StudentTable({ students, isLoading, page, setPage, total, limit, onEdit, onDelete, onRowClick }) {
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
@@ -34,7 +34,6 @@ export default function StudentTable({ students, isLoading, page, setPage, total
             <tr className="bg-gray-50 border-b border-gray-200 text-[10px] uppercase text-gray-500 font-black tracking-widest">
               <th className="px-6 py-4">Name</th>
               <th className="px-6 py-4">Class</th>
-              <th className="px-6 py-4">Contact</th>
               <th className="px-6 py-4">Fees Status</th>
               <th className="px-6 py-4">Pending</th>
               <th className="px-6 py-4">TC</th>
@@ -46,10 +45,24 @@ export default function StudentTable({ students, isLoading, page, setPage, total
           </thead>
           <tbody className="divide-y divide-gray-100">
             {students.map((student) => (
-              <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4 font-bold text-gray-900">{student.fullName}</td>
+              <tr 
+                key={student.id} 
+                onClick={() => onRowClick(student)}
+                className="hover:bg-gray-100/70 cursor-pointer transition-colors duration-300"
+              >
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-900">{student.fullName}</span>
+                    {(student.fatherName || student.address) && (
+                      <span className="text-[11px] text-gray-400 font-normal mt-0.5 leading-normal">
+                        {student.fatherName ? `Father: ${student.fatherName}` : ''}
+                        {student.fatherName && student.address ? ' | ' : ''}
+                        {student.address ? `Address: ${student.address}` : ''}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-6 py-4 text-gray-600 font-medium">{student.className}</td>
-                <td className="px-6 py-4 text-gray-500 font-mono tracking-tighter">{student.contactNumber || "-"}</td>
                 <td className="px-6 py-4">
                   <Badge 
                     status={
@@ -74,7 +87,7 @@ export default function StudentTable({ students, isLoading, page, setPage, total
                 <td className="px-6 py-4">
                   <StatusBadge condition={student.uniformPaid} />
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-2">
                     <button
                       onClick={() => onEdit(student)}
@@ -126,16 +139,10 @@ export default function StudentTable({ students, isLoading, page, setPage, total
 }
 
 function StatusBadge({ condition }) {
-  return condition ? (
-    <div className="flex items-center gap-1.5 text-emerald-600 font-black text-[10px] uppercase tracking-tight">
-      <CheckCircle2 size={14} className="text-emerald-500" />
-      YES
-    </div>
-  ) : (
-    <div className="flex items-center gap-1.5 text-rose-500 font-black text-[10px] uppercase tracking-tight">
-      <XCircle size={14} className="text-rose-400/70" />
-      NO
-    </div>
+  return (
+    <span className="text-base select-none">
+      {condition ? "✅" : "❌"}
+    </span>
   );
 }
 
