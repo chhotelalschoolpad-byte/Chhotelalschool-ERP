@@ -68,8 +68,28 @@ export default function AdmissionForm({ initialData = null }) {
   const [isExisting, setIsExisting] = useState(initialData?.isExisting || false);
   const [bannerError, setBannerError] = useState('');
   const admissionNumberRef = useRef(null);
+  const [nextAdmissionNumber, setNextAdmissionNumber] = useState('');
 
   const isEditMode = !!initialData;
+
+  useEffect(() => {
+    if (!isEditMode && !isExisting) {
+      const fetchNextNumber = async () => {
+        try {
+          const res = await fetch('/api/students/next-number');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.nextNumber) {
+              setNextAdmissionNumber(data.nextNumber);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch next admission number:', error);
+        }
+      };
+      fetchNextNumber();
+    }
+  }, [isEditMode, isExisting]);
 
   const form = useForm({
     resolver: zodResolver(isEditMode ? updateStudentSchema : createStudentSchema),
@@ -223,7 +243,7 @@ export default function AdmissionForm({ initialData = null }) {
           <p className="text-sm font-semibold">
             {isExisting
               ? "Enter original admission details and outstanding dues."
-              : `Roll numbers are auto-generated. Next: ADM-${currentYear}-####`
+              : `Roll numbers are auto-generated. Next: ${nextAdmissionNumber || `ADM-${currentYear}-####`}`
             }
           </p>
         </div>
