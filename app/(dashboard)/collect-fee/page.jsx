@@ -119,9 +119,10 @@ export default function CollectFeePage() {
   }, [student, currentSessionYear]);
 
   const sessions = useMemo(() => {
-    if (joiningYear === null) return [];
     const list = [];
-    for (let y = joiningYear; y <= currentSessionYear; y++) {
+    const startYear = currentSessionYear - 10;
+    const endYear = currentSessionYear + 1;
+    for (let y = startYear; y <= endYear; y++) {
       const nextYearShort = String(y + 1).slice(-2);
       list.push({
         year: y,
@@ -129,7 +130,7 @@ export default function CollectFeePage() {
       });
     }
     return list;
-  }, [joiningYear, currentSessionYear]);
+  }, [currentSessionYear]);
 
   const monthGrid = useMemo(() => {
     if (!student || !selectedSession) return [];

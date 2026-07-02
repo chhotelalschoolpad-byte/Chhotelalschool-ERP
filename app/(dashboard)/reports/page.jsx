@@ -3,12 +3,15 @@
 import useSWR from 'swr';
 import { useState, useMemo, useEffect } from 'react';
 import Badge from '@/components/ui/Badge';
-import { DownloadCloud, IndianRupee, PieChart, Banknote, QrCode, CreditCard, CalendarDays, Receipt, Download } from 'lucide-react';
+import { DownloadCloud, IndianRupee, PieChart, Banknote, QrCode, CreditCard, CalendarDays, Receipt, Download, Trash2 } from 'lucide-react';
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import ReceiptPDF from "@/components/pdf/ReceiptPDF";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import DatePicker from '@/components/ui/DatePicker';
 import { useRouter } from 'next/navigation';
+import { useAuth } from "@/context/AuthContext";
+import toast from "react-hot-toast";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 
 function formatMonthLabel(ym) {
   if (!ym) return "N/A";
@@ -98,10 +101,16 @@ const fetcher = url => fetch(url).then(r => r.json());
 
 export default function ReportsPage() {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "ADMIN";
+  const isManager = currentUser?.role === "MANAGER";
+  const canArchive = isAdmin || isManager;
+
   const [activeTab, setActiveTab] = useState('daily');
   const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10));
   const [monthStr, setMonthStr] = useState(new Date().toISOString().slice(0, 7));
   const { settings } = useSchoolSettings();
+  const [paymentToArchive, setPaymentToArchive] = useState(null);
 
   const currentSessionYear = useMemo(() => {
     const today = new Date();
@@ -111,9 +120,10 @@ export default function ReportsPage() {
   const [selectedSession, setSelectedSession] = useState(currentSessionYear);
 
   const sessions = useMemo(() => {
-    const startYear = 2024;
     const list = [];
-    for (let y = startYear; y <= currentSessionYear; y++) {
+    const startYear = currentSessionYear - 10;
+    const endYear = currentSessionYear + 1;
+    for (let y = startYear; y <= endYear; y++) {
       const nextYearShort = String(y + 1).slice(-2);
       list.push({
         year: y,
@@ -127,8 +137,21 @@ export default function ReportsPage() {
     activeTab === 'monthly' ? `/api/reports/monthly?month=${monthStr}&session=${selectedSession}` :
       `/api/reports/pending?session=${selectedSession}`;
 
-  const { data, isLoading } = useSWR(endpoint, fetcher);
+  const { data, isLoading, mutate } = useSWR(endpoint, fetcher);
   const reportData = data?.data;
+
+  const handleArchivePayment = async () => {
+    if (!paymentToArchive) return;
+    const res = await fetch("/api/payments/" + paymentToArchive, { method: "DELETE" });
+    if (res.ok) {
+      toast.success("Payment archived");
+      await mutate();
+    } else {
+      const e = await res.json();
+      toast.error(e.error || "Archive failed");
+    }
+    setPaymentToArchive(null);
+  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 15;
@@ -321,12 +344,22 @@ export default function ReportsPage() {
                           <td className="px-4 py-1.5 text-amber-600 font-medium text-right whitespace-nowrap">{p.discount > 0 ? formatIN(p.discount) : '-'}</td>
                           <td className="px-4 py-1.5 text-emerald-600 font-medium text-right whitespace-nowrap">+{formatIN(p.amount - p.discount)}</td>
                           <td className="px-4 py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                             <PDFDownloadLink document={<ReceiptPDF payment={p} student={p.student} settings={settings} />} fileName={`Receipt_${p.receiptNumber}.pdf`}>
-                               <button className="h-7 w-7 bg-gray-50 hover:bg-blue-600 hover:text-white rounded-lg text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm mx-auto">
-                                 <Download size={14} />
-                               </button>
-                             </PDFDownloadLink>
-                          </td>
+                             <div className="flex items-center justify-center gap-1.5">
+                               <PDFDownloadLink document={<ReceiptPDF payment={p} student={p.student} settings={settings} />} fileName={`Receipt_${p.receiptNumber}.pdf`}>
+                                 <button className="h-7 w-7 bg-gray-50 hover:bg-blue-600 hover:text-white rounded-lg text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm">
+                                   <Download size={14} />
+                                 </button>
+                               </PDFDownloadLink>
+                               {canArchive && (
+                                 <button
+                                   onClick={() => setPaymentToArchive(p.id)}
+                                   className="h-7 w-7 bg-gray-50 hover:bg-red-500 hover:text-white rounded-lg text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm"
+                                 >
+                                   <Trash2 size={14} />
+                                 </button>
+                               )}
+                             </div>
+                           </td>
                         </tr>
                       ))
                     ) : activeTab === 'pending' && reportData?.students?.length === 0 ? (
@@ -392,6 +425,7 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+      <ConfirmModal isOpen={!!paymentToArchive} onClose={() => setPaymentToArchive(null)} onConfirm={handleArchivePayment} title="Void Payment?" message="This record will be moved to the archive." />
     </div>
   );
 }
