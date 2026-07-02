@@ -210,10 +210,18 @@ export default function ReceiptPDF({ payment, student, settings }) {
   };
 
   // Build Table Rows
+  const chronologicalMonthOrder = [
+    "April", "May", "June", "July", "August", "September",
+    "October", "November", "December", "January", "February", "March"
+  ];
+
   let finalRows = [];
   rawItems.forEach(item => {
     if (item.months && Array.isArray(item.months) && item.months.length > 0) {
-      item.months.forEach(mName => {
+      const sortedMonths = [...item.months].sort((a, b) => {
+        return chronologicalMonthOrder.indexOf(a) - chronologicalMonthOrder.indexOf(b);
+      });
+      sortedMonths.forEach(mName => {
         finalRows.push({
           type: item.type,
           monthName: mName,
