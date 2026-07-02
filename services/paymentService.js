@@ -36,6 +36,24 @@ export async function deletePayment(id, deletedBy) {
       });
     }
 
+    // Rollback individual dues records
+    const items = Array.isArray(payment.paymentItems) ? payment.paymentItems : [];
+    for (const item of items) {
+      if (item && item.dueId) {
+        const dueExists = await tx.studentDue.findUnique({
+          where: { id: item.dueId }
+        });
+        if (dueExists) {
+          await tx.studentDue.update({
+            where: { id: item.dueId },
+            data: {
+              paidAmount: { decrement: Math.min(item.total, dueExists.paidAmount) }
+            }
+          });
+        }
+      }
+    }
+
     // 4. Delete the original payment record
     return tx.payment.delete({
       where: { id }

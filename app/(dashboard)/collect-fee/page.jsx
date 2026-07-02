@@ -50,9 +50,22 @@ export default function CollectFeePage() {
   const [selectedMonthsSet, setSelectedMonthsSet] = useState(new Set());
   const [selectedTypes, setSelectedTypes] = useState(new Set(["Monthly Fee"]));
   const [prevDueAmount, setPrevDueAmount] = useState(0);
+  const [paidDuesMap, setPaidDuesMap] = useState({});
+  const [customPaymentDate, setCustomPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isManualDate, setIsManualDate] = useState(false);
   const [vanAmount, setVanAmount] = useState(0);
   const [admissionAmount, setAdmissionAmount] = useState(0);
   const [examAmount, setExamAmount] = useState(0);
+
+  useEffect(() => {
+    if (student?.dues) {
+      const initialMap = {};
+      student.dues.forEach(d => {
+        initialMap[d.id] = 0;
+      });
+      setPaidDuesMap(initialMap);
+    }
+  }, [student]);
 
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
@@ -332,6 +345,24 @@ export default function CollectFeePage() {
       });
     }
 
+    // Outstanding Dues Payment
+    if (student?.dues) {
+      student.dues.forEach(d => {
+        const amt = paidDuesMap[d.id] || 0;
+        if (amt > 0) {
+          const typeLabel = d.dueType === 'LEGACY'
+            ? `Legacy Due (Session ${d.sessionYear}-${String(parseInt(d.sessionYear) + 1).slice(-2)})`
+            : `Misc Due: ${d.notes || 'Other'}`;
+
+          itemsList.push({
+            feeType: typeLabel,
+            monthLabel: "Outstanding Dues",
+            amount: amt
+          });
+        }
+      });
+    }
+
     allItems = itemsList;
   }
 
@@ -390,13 +421,19 @@ export default function CollectFeePage() {
           };
         });
 
+        const payloadPaidDues = Object.entries(paidDuesMap)
+          .filter(([id, amount]) => amount > 0)
+          .map(([id, amount]) => ({ id, amountPaid: amount }));
+
         bodyData = {
           studentId: student.id,
           months: payloadMonths,
           paymentItems: payloadItems,
           paymentMode,
           discount: safeDiscount,
-          previousDueAmount: Number(prevDueAmount)
+          previousDueAmount: Number(prevDueAmount),
+          paidDues: payloadPaidDues,
+          paymentDate: isManualDate ? customPaymentDate : undefined
         };
       }
 
@@ -437,7 +474,7 @@ export default function CollectFeePage() {
     const receiptData = {
       ...result.payment, // Spreads current month, paymentItems, previousDueCleared, etc.
       receiptNumber:      result.receiptNumber,
-      paymentDate:        new Date(),
+      paymentDate:        result.payment?.paymentDate || new Date(),
       paymentMode,
       discount:           Number(safeDiscount),
       amount:             result.total,
@@ -557,8 +594,34 @@ export default function CollectFeePage() {
                 )}
 
                  <div className="space-y-4 pt-2">
-                    <div className="flex justify-between items-center pb-3 border-b border-gray-100">
-                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Select Months to Pay</p>
+                     <div className="flex justify-between items-center pb-3 border-b border-gray-100 flex-wrap gap-2">
+                       <div className="flex items-center gap-3">
+                         <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Select Months to Pay</p>
+                         
+                         {student && monthGrid.filter(m => m.state !== 'green' && m.state !== 'blue').length > 0 && (
+                           <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                             <input 
+                               type="checkbox"
+                               checked={
+                                 monthGrid.filter(m => m.state !== 'green' && m.state !== 'blue').every(m => selectedMonthsSet.has(m.ym))
+                               }
+                               onChange={(e) => {
+                                 const selectableMonths = monthGrid.filter(m => m.state !== 'green' && m.state !== 'blue');
+                                 const allSelected = selectableMonths.every(m => selectedMonthsSet.has(m.ym));
+                                 const next = new Set(selectedMonthsSet);
+                                 if (allSelected) {
+                                   selectableMonths.forEach(m => next.delete(m.ym));
+                                 } else {
+                                   selectableMonths.forEach(m => next.add(m.ym));
+                                 }
+                                 setSelectedMonthsSet(next);
+                               }}
+                               className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                             />
+                             <span className="text-[9px] font-black text-blue-600 uppercase tracking-wider">Select All</span>
+                           </label>
+                         )}
+                       </div>
                       {sessions.length > 0 && (
                         <select
                           value={selectedSession}
@@ -663,23 +726,49 @@ export default function CollectFeePage() {
                    </div>
                 </div>
 
-                {remainingPrevDue > 0 && (
-                   <div className="pt-6 border-t border-gray-100">
-                      <p className="text-[10px] font-black uppercase text-rose-500 tracking-widest pl-1 mb-3 flex items-center gap-2">
-                        <AlertCircle size={12} /> Legacy Due Clearance (Max: {fmt(remainingPrevDue)})
-                      </p>
-                      <div className="relative">
-                         <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300" size={18} />
-                         <input 
-                            type="number" 
-                            placeholder="Amount to clear..."
-                            value={prevDueAmount}
-                            onChange={e => setPrevDueAmount(Math.min(remainingPrevDue, Number(e.target.value)))}
-                            className="w-full h-14 bg-rose-50/50 border-2 border-rose-100 rounded-2xl pl-12 pr-4 font-black text-rose-700 placeholder:text-rose-200"
-                         />
-                      </div>
-                   </div>
-                )}
+                 {(student?.dues || []).filter(d => d.amount - d.paidAmount > 0).length > 0 && (
+                    <div className="pt-6 border-t border-gray-100 space-y-4">
+                       <p className="text-[10px] font-black uppercase text-rose-500 tracking-widest pl-1 mb-1 flex items-center gap-2">
+                         <AlertCircle size={12} /> Outstanding Dues Clearance
+                       </p>
+                       
+                       <div className="space-y-3">
+                         {(student?.dues || [])
+                           .filter(d => d.amount - d.paidAmount > 0)
+                           .map(d => {
+                             const remaining = d.amount - d.paidAmount;
+                             const label = d.dueType === 'LEGACY' 
+                               ? `Legacy Due (Session ${d.sessionYear}-${String(parseInt(d.sessionYear) + 1).slice(-2)})`
+                               : `Misc Due: ${d.notes || 'Other'}`;
+
+                             return (
+                               <div key={d.id} className="bg-rose-50/30 border border-rose-100/50 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                 <div>
+                                   <p className="text-xs font-bold text-gray-800">{label}</p>
+                                   <p className="text-[10px] font-medium text-rose-500">Remaining: {fmt(remaining)}</p>
+                                 </div>
+                                 <div className="relative shrink-0">
+                                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-rose-400 text-xs">₹</span>
+                                   <input
+                                     type="number"
+                                     placeholder="0"
+                                     value={paidDuesMap[d.id] || ""}
+                                     onChange={(e) => {
+                                       const val = Math.min(remaining, Math.max(0, parseInt(e.target.value) || 0));
+                                       setPaidDuesMap({
+                                         ...paidDuesMap,
+                                         [d.id]: val
+                                       });
+                                     }}
+                                     className="w-32 h-10 bg-white border border-rose-200 rounded-xl pl-7 pr-3 text-right font-black text-rose-700 focus:ring-2 focus:ring-rose-100 outline-none transition-all text-xs"
+                                   />
+                                 </div>
+                               </div>
+                             );
+                           })}
+                       </div>
+                    </div>
+                 )}
              </div>
           )}
 
@@ -707,6 +796,25 @@ export default function CollectFeePage() {
 
         {/* RIGHT: CONTROLS */}
         <div className="lg:col-span-2 space-y-6">
+           {/* PAYMENT DATE CHOICE */}
+           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8">
+              <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Receipt Print Date</h2>
+              <div>
+                <input 
+                  type="date"
+                  value={customPaymentDate}
+                  onChange={(e) => {
+                    setCustomPaymentDate(e.target.value);
+                    setIsManualDate(true);
+                  }}
+                  className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-850 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm cursor-pointer"
+                />
+                <p className="text-[10px] text-gray-400 font-medium mt-2 leading-relaxed">
+                  Select a custom date for the printed receipt. If unselected or today, the current date and time will be used.
+                </p>
+              </div>
+           </div>
+
            {/* PAYMENT MODE */}
            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8">
               <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-6">Execution Mode</h2>

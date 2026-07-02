@@ -168,6 +168,7 @@ export const studentQuerySchema = z.object({
   class: z.string().optional(),
   status:     z.enum(["paid", "pending", "legacy_due", "all"]).optional(),
   isExisting: z.enum(["true", "false"]).optional(),
+  session: z.coerce.number().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(0).max(10000).default(20),
 });

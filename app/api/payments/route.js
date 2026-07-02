@@ -36,13 +36,41 @@ export async function POST(req) {
       paymentMode, 
       discount, 
       previousDueAmount, 
+      paymentDate,
+      paidDues = [],
       paymentItems,
       selectedItems 
     } = result.data;
 
     // 1. Normalize Inputs (Bridge old style requests)
-    let finalPaymentItems = paymentItems;
+    let finalPaymentItems = [...paymentItems];
     let finalMonths = months;
+
+    // Fetch details of dues being paid
+    let dbPaidDues = [];
+    if (paidDues && paidDues.length > 0) {
+      dbPaidDues = await prisma.studentDue.findMany({
+        where: { id: { in: paidDues.map(d => d.id) } }
+      });
+    }
+
+    // Add paid dues to finalPaymentItems so they show up in receipts
+    for (const pd of paidDues) {
+      const dbDue = dbPaidDues.find(d => d.id === pd.id);
+      if (dbDue) {
+        const typeLabel = dbDue.dueType === 'LEGACY' 
+          ? `Legacy Due (Session ${dbDue.sessionYear})` 
+          : `Misc Due: ${dbDue.notes || 'Other'}`;
+        finalPaymentItems.push({
+          type: typeLabel,
+          dueId: dbDue.id,
+          months: undefined,
+          rate: pd.amountPaid,
+          quantity: 1,
+          total: pd.amountPaid
+        });
+      }
+    }
 
     if (paymentItems.length === 0 && selectedItems && selectedItems.length > 0) {
       finalPaymentItems = selectedItems.map(i => {
@@ -145,20 +173,43 @@ export async function POST(req) {
         throw { status: 404, message: 'Student not found' };
       }
 
-      // Legacy Due Clearance
+      // 1. Update individual StudentDue records
+      let totalLegacyCleared = 0;
+      for (const pd of paidDues) {
+        const dbDue = dbPaidDues.find(d => d.id === pd.id);
+        if (dbDue) {
+          const remaining = Math.max(0, dbDue.amount - dbDue.paidAmount);
+          const toPay = Math.min(pd.amountPaid, remaining);
+          if (toPay > 0) {
+            await tx.studentDue.update({
+              where: { id: pd.id },
+              data: { paidAmount: { increment: toPay } }
+            });
+            if (dbDue.dueType === 'LEGACY') {
+              totalLegacyCleared += toPay;
+            }
+          }
+        }
+      }
+
+      // 2. Legacy Due Clearance (backward compatibility for previousDueAmount)
       let actualClearing = 0;
       if (previousDueAmount > 0) {
         const remainingToClear = Math.max(0, student.previousDue - student.previousDuePaid);
         actualClearing = Math.min(previousDueAmount, remainingToClear);
       }
 
-      await tx.student.update({
-        where: { id: studentId },
-        data: {
-          previousDuePaid: { increment: actualClearing },
-          updatedAt: new Date()
-        }
-      });
+      // 3. Update total legacy dues paid on Student model
+      const incrementLegacyPaid = actualClearing + totalLegacyCleared;
+      if (incrementLegacyPaid > 0) {
+        await tx.student.update({
+          where: { id: studentId },
+          data: {
+            previousDuePaid: { increment: incrementLegacyPaid },
+            updatedAt: new Date()
+          }
+        });
+      }
 
       // Receipt number & Month YM generation
       const receiptNumber = await generateReceiptNumber(tx);
@@ -167,6 +218,13 @@ export async function POST(req) {
         const firstM = finalMonths[0];
         const monthIndex = monthNames.indexOf(firstM.month) + 1;
         legacyMonthVal = `${firstM.year}-${String(monthIndex).padStart(2, '0')}`;
+      }
+
+      // Calculate payment Date
+      let finalPaymentDate = new Date();
+      if (paymentDate) {
+        const [y, m, d] = paymentDate.split('-').map(Number);
+        finalPaymentDate = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
       }
 
       const payment = await tx.payment.create({
@@ -182,8 +240,9 @@ export async function POST(req) {
           recordedBy: authResult.user.username,
           paymentItems: finalPaymentItems,
           isMonthlyPaid,
-          previousDueCleared: actualClearing,
-          status: 'SUCCESS'
+          previousDueCleared: incrementLegacyPaid,
+          status: 'SUCCESS',
+          paymentDate: finalPaymentDate
         }
       });
 

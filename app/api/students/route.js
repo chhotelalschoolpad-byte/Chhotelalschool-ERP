@@ -56,6 +56,7 @@ export async function GET(req) {
     if (searchParams.get('class'))      query.class      = searchParams.get('class');
     if (searchParams.get('status'))     query.status     = searchParams.get('status');
     if (searchParams.get('isExisting')) query.isExisting = searchParams.get('isExisting');
+    if (searchParams.get('session'))    query.session    = searchParams.get('session');
 
     const parsed = studentQuerySchema.safeParse(query);
     if (!parsed.success) {

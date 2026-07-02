@@ -2,7 +2,7 @@
 
 import { useStudents } from '@/hooks/useStudents';
 import { useSchoolSettings, useSystemSettings } from '@/hooks/useSettings';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDebounce } from 'use-debounce';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -21,6 +21,27 @@ export default function StudentsPage() {
   const [page, setPage]                   = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  const currentSessionYear = useMemo(() => {
+    const today = new Date();
+    return today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  }, []);
+
+  const [filterSession, setFilterSession] = useState(currentSessionYear);
+
+  const sessions = useMemo(() => {
+    const list = [];
+    const startYear = currentSessionYear - 10;
+    const endYear = currentSessionYear + 1;
+    for (let y = startYear; y <= endYear; y++) {
+      const nextYearShort = String(y + 1).slice(-2);
+      list.push({
+        year: y,
+        label: `${y}-${nextYearShort}`
+      });
+    }
+    return list;
+  }, [currentSessionYear]);
+
   const { settings: systemSettings } = useSystemSettings();
   const classes = systemSettings?.defaultClasses || [];
 
@@ -29,10 +50,10 @@ export default function StudentsPage() {
     filterType === 'existing' ? '&isExisting=true'  :
     filterType === 'new'      ? '&isExisting=false' : '';
 
-  const queryParams = `?search=${debouncedSearch}&class=${filterClass}&status=${filterStatus}${isExistingParam}&page=${page}&limit=20`;
+  const queryParams = `?search=${debouncedSearch}&class=${filterClass}&status=${filterStatus}${isExistingParam}&session=${filterSession}&page=${page}&limit=20`;
   const { students, total, isLoading, mutate } = useStudents(queryParams);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, filterClass, filterStatus, filterType]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, filterClass, filterStatus, filterType, filterSession]);
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
@@ -77,6 +98,19 @@ export default function StudentsPage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          {/* Session filter */}
+          <select
+            className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"
+            value={filterSession}
+            onChange={(e) => setFilterSession(e.target.value)}
+          >
+            {sessions.map(s => (
+              <option key={s.year} value={s.year}>
+                Session {s.label}
+              </option>
+            ))}
+          </select>
+
           {/* Class filter */}
           <select
             className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 text-gray-700"

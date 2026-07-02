@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import DuesManagerModal from "@/components/students/DuesManagerModal";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import ReceiptPDF from "@/components/pdf/ReceiptPDF";
 
@@ -179,6 +180,7 @@ export default function StudentProfile() {
   const [feeStructure, setFeeStructure] = useState(null);
   const [siblings, setSiblings] = useState([]);
   const [isExemptLoading, setIsExemptLoading] = useState(false);
+  const [duesManagerOpen, setDuesManagerOpen] = useState(false);
 
   const currentSessionYear = useMemo(() => {
     const today = new Date();
@@ -280,7 +282,7 @@ export default function StudentProfile() {
       let pSessionYear;
       if (p.month && p.month.includes('-')) {
         const [y, m] = p.month.split('-');
-        pSessionYear = Number(y);
+        pSessionYear = Number(m) >= 4 ? Number(y) : Number(y) - 1;
       }
       if (pSessionYear === undefined) {
         const pDate = new Date(p.paymentDate);
@@ -295,11 +297,36 @@ export default function StudentProfile() {
   const remainingPrevDue = Math.max(0, (student?.previousDue || 0) - (student?.previousDuePaid || 0));
 
   const lastMonthlyPayment = useMemo(() => {
-    const monthlyOnes = payments
-      .filter(p => p.isMonthlyPaid && p.month)
-      .sort((a, b) => b.month.localeCompare(a.month));
-    return monthlyOnes[0]?.month || null;
-  }, [payments]);
+    const monthNames = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const paidMonthsList = [];
+
+    payments.forEach(p => {
+      if (!p.isMonthlyPaid) return;
+      
+      if (p.selectedMonths && Array.isArray(p.selectedMonths)) {
+        p.selectedMonths.forEach(sm => {
+          const monthIndex = monthNames.indexOf(sm.month) + 1;
+          if (monthIndex > 0) {
+            paidMonthsList.push(`${sm.year}-${String(monthIndex).padStart(2, '0')}`);
+          }
+        });
+      } else if (p.month && p.month.includes('-')) {
+        paidMonthsList.push(p.month);
+      }
+    });
+
+    const sessionMonths = paidMonthsList.filter(ym => {
+      const [y, m] = ym.split('-');
+      const pSessionYear = Number(m) >= 4 ? Number(y) : Number(y) - 1;
+      return Number(pSessionYear) === Number(selectedSession);
+    });
+
+    sessionMonths.sort((a, b) => b.localeCompare(a));
+    return sessionMonths[0] || null;
+  }, [payments, selectedSession]);
 
   const totalPaidInSession = useMemo(() =>
     filteredPayments.reduce((sum, p) => sum + p.amount, 0),
@@ -578,7 +605,7 @@ export default function StudentProfile() {
               <div className="h-10 w-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500 border border-rose-100 shrink-0"><MapPin size={20} /></div>
               <div>
                 <p className="text-[10px] font-black uppercase text-rose-400 mb-1">Residence Location</p>
-                <p className="text-xs font-bold text-gray-700 leading-relaxed truncate">{student.address || 'N/A'}</p>
+                <p className="text-xs font-bold text-gray-700 leading-relaxed break-words whitespace-pre-wrap">{student.address || 'N/A'}</p>
                 <p className="text-xs font-bold text-gray-700 opacity-60 italic">{student.state || 'N/A'}, {student.country}</p>
               </div>
             </div>
@@ -769,15 +796,54 @@ export default function StudentProfile() {
               </div>
             </div>
 
-            {remainingPrevDue > 0 && (
-              <div className="bg-rose-50 border border-rose-100 rounded-[2rem] p-8 group">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400 mb-2">Legacy Dues Remaining</p>
-                <h3 className="text-4xl font-black text-rose-700 mb-4">{fmt(remainingPrevDue)}</h3>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-rose-500">
-                  <AlertCircle size={14} /> Critical Attention
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-1">Dues & Balances</p>
+                  <h3 className="text-2xl font-black text-gray-900">
+                    {fmt(
+                      (student?.dues || []).reduce((sum, d) => sum + Math.max(0, d.amount - d.paidAmount), 0)
+                    )}
+                  </h3>
                 </div>
+                {(isAdmin || isManager) && (
+                  <button
+                    onClick={() => setDuesManagerOpen(true)}
+                    className="inline-flex items-center justify-center border border-blue-200 hover:border-blue-300 hover:bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Manage
+                  </button>
+                )}
               </div>
-            )}
+
+              {/* Dues List */}
+              <div className="space-y-3.5 mt-6">
+                {(student?.dues || []).filter(d => d.amount - d.paidAmount > 0).length === 0 ? (
+                  <p className="text-xs text-gray-400 font-medium italic">No outstanding dues for this student.</p>
+                ) : (
+                  (student?.dues || [])
+                    .filter(d => d.amount - d.paidAmount > 0)
+                    .map(d => {
+                      const label = d.dueType === 'LEGACY' 
+                        ? `Legacy Session ${d.sessionYear}-${String(parseInt(d.sessionYear) + 1).slice(-2)}`
+                        : `Misc: ${d.notes || 'Unspecified'}`;
+                      const remaining = d.amount - d.paidAmount;
+
+                      return (
+                        <div key={d.id} className="flex justify-between items-center border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
+                          <div>
+                            <p className="text-xs font-bold text-gray-800">{label}</p>
+                            <p className="text-[10px] font-medium text-gray-400">Total: {fmt(d.amount)} • Paid: {fmt(d.paidAmount)}</p>
+                          </div>
+                          <span className="text-xs font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
+                            {fmt(remaining)}
+                          </span>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
 
             <div className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Last Monthly Paid</p>
@@ -828,6 +894,14 @@ export default function StudentProfile() {
       {/* CONFIRM MODALS */}
       <ConfirmModal isOpen={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} onConfirm={handleDelete} title="Confirm Deletion?" message="This will permanently delete the student and all payment logs." />
       <ConfirmModal isOpen={!!paymentToArchive} onClose={() => setPaymentToArchive(null)} onConfirm={handleArchivePayment} title="Void Payment?" message="This record will be moved to the archive." />
+
+      <DuesManagerModal 
+        isOpen={duesManagerOpen} 
+        onClose={() => setDuesManagerOpen(false)} 
+        studentId={id} 
+        initialDues={student?.dues || []} 
+        onSaved={mutate} 
+      />
 
     </div>
   );

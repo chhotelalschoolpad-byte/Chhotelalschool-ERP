@@ -247,11 +247,18 @@ export default function ReceiptPDF({ payment, student, settings }) {
   const paySessionStartYear = parseInt(sessionStr.split('-')[0], 10);
   const diff = isNaN(paySessionStartYear) || isNaN(jYear) ? 0 : paySessionStartYear - jYear;
   const className = getPromotedClass(baseClassName, diff);
-  const printDate = new Date(paymentDate).toLocaleDateString('en-IN', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: true
-  });
+  const dateObj = new Date(paymentDate);
+  const isDefaultDate = (dateObj.getUTCHours() !== 0 || dateObj.getUTCMinutes() !== 0 || dateObj.getUTCSeconds() !== 0);
+  const printDate = isDefaultDate 
+    ? dateObj.toLocaleDateString('en-IN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: true
+      })
+    : dateObj.toLocaleDateString('en-IN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        timeZone: 'UTC'
+      });
 
   const formatMonthLabel = (ym) => {
     if (!ym) return '—';
@@ -289,7 +296,11 @@ export default function ReceiptPDF({ payment, student, settings }) {
     }
   });
 
-  if (Number(previousDueCleared) > 0) {
+  const hasLegacyInItems = rawItems.some(item => 
+    item.type?.toLowerCase().includes('legacy') || 
+    item.type?.toLowerCase().includes('due')
+  );
+  if (Number(previousDueCleared) > 0 && !hasLegacyInItems) {
     finalRows.push({ type: 'Legacy Balance Cleared', monthName: '—', amount: Number(previousDueCleared) });
   }
 
@@ -355,14 +366,13 @@ export default function ReceiptPDF({ payment, student, settings }) {
                {finalRows.map((item, i) => {
                   const isMo = item.type?.toLowerCase().includes('monthly');
                   const isFirst = (i === topRowIdx);
-                  const itemD = isFirst ? Number(discount) : 0;
                   return (
                    <View key={i} style={styles.tr}>
                      <Text style={[styles.td, styles.colSno]}>{i + 1}</Text>
                      <Text style={[styles.td, styles.colParticulars]}>{item.type?.toUpperCase() || 'FEE PAYMENT'}</Text>
                      <Text style={[styles.td, styles.colMonth]}>{item.monthName || (isMo ? formatMonthLabel(payMonth) : '—')}</Text>
-                     <Text style={[styles.td, styles.colPayable]}>{Math.round(item.amount + itemD)}</Text>
-                     <Text style={[styles.td, styles.colDiscount]}>{Math.round(itemD)}</Text>
+                     <Text style={[styles.td, styles.colPayable]}>{Math.round(item.amount)}</Text>
+                     <Text style={[styles.td, styles.colDiscount]}>—</Text>
                      <Text style={[styles.td, styles.colPaid]}>{Math.round(item.amount)}</Text>
                      <Text style={[styles.td, styles.tdLast, styles.colDue]}>{isFirst && remainDue > 0 ? Math.round(remainDue) : '—'}</Text>
                    </View>
@@ -374,7 +384,7 @@ export default function ReceiptPDF({ payment, student, settings }) {
                 <Text style={[styles.td, styles.colSno, { borderRightWidth: 0 }]}></Text>
                 <Text style={[styles.td, styles.colParticulars, { fontFamily: 'Helvetica-Bold', fontSize: 13, textAlign: 'center' }]}>TOTAL</Text>
                 <Text style={[styles.td, styles.colMonth]}></Text>
-                <Text style={[styles.td, styles.colPayable, { fontFamily: 'Helvetica-Bold', fontSize: 13 }]}>{Math.round(finalRows.reduce((a, b) => a + Number(b.amount || 0), 0) + Number(discount))}</Text>
+                <Text style={[styles.td, styles.colPayable, { fontFamily: 'Helvetica-Bold', fontSize: 13 }]}>{Math.round(finalRows.reduce((a, b) => a + Number(b.amount || 0), 0))}</Text>
                 <Text style={[styles.td, styles.colDiscount, { fontFamily: 'Helvetica-Bold', fontSize: 13 }]}>{Math.round(discount)}</Text>
                 <Text style={[styles.td, styles.colPaid, { fontFamily: 'Helvetica-Bold', fontSize: 13 }]}>{Math.round(totalPaidAmt)}</Text>
                 <Text style={[styles.td, styles.tdLast, styles.colDue, { fontFamily: 'Helvetica-Bold', fontSize: 13 }]}>{Math.round(remainDue)}</Text>

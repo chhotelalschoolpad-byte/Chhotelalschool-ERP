@@ -10,6 +10,11 @@ export const createPaymentSchema = z.object({
   paymentMode: z.enum(["Cash", "UPI", "Transfer", "Bank Transfer"]),
   discount: z.number().min(0).default(0),
   previousDueAmount: z.number().min(0).default(0),
+  paymentDate: z.string().optional(),
+  paidDues: z.array(z.object({
+    id: z.string().uuid(),
+    amountPaid: z.number().min(0)
+  })).optional(),
   paymentItems: z.array(z.object({
     type: z.string().min(1),
     months: z.array(z.string()).optional(),
@@ -18,7 +23,7 @@ export const createPaymentSchema = z.object({
     total: z.coerce.number().min(0)
   })).default([]),
   selectedItems: z.any().optional() // For backward compatibility
-}).refine(data => data.paymentItems.length > 0 || data.previousDueAmount > 0 || (data.selectedItems && data.selectedItems.length > 0), {
+}).refine(data => data.paymentItems.length > 0 || data.previousDueAmount > 0 || (data.selectedItems && data.selectedItems.length > 0) || (data.paidDues && data.paidDues.length > 0), {
   message: "Select at least one fee item or enter legacy due amount",
   path: ["paymentItems"]
 });

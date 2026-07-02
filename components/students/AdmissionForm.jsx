@@ -470,7 +470,7 @@ export default function AdmissionForm({ initialData = null }) {
               </div>
             )}
 
-            {isEditMode && isExisting && (
+            {isEditMode && (
               <div className="md:col-span-2">
                 <Field
                   label="Outstanding Previous Dues (₹)"

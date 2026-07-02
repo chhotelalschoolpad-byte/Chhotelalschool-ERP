@@ -46,6 +46,7 @@ model Student {
   parentAadhaarNumber String?
   deletedPayments     DeletedPayment[]
   payments            Payment[]
+  dues                StudentDue[]
 }
 
 model FeeStructure {
@@ -147,4 +148,17 @@ enum Status {
   PAID
   PENDING
   PARTIAL
+}
+
+model StudentDue {
+  id          String   @id @default(uuid())
+  studentId   String
+  sessionYear String
+  dueType     String
+  amount      Int
+  paidAmount  Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
