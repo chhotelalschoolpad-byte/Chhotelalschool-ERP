@@ -34,6 +34,12 @@ function formatMonthLabel(ym) {
 function formatMonthsRange(payment) {
   if (payment.selectedMonths && Array.isArray(payment.selectedMonths) && payment.selectedMonths.length > 0) {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const shortMonths = {
+      "January": "Jan", "February": "Feb", "March": "Mar", "April": "Apr",
+      "May": "May", "June": "Jun", "July": "Jul", "August": "Aug",
+      "September": "Sep", "October": "Oct", "November": "Nov", "December": "Dec"
+    };
+
     const items = payment.selectedMonths.map(m => {
       const idx = monthNames.indexOf(m.month);
       return {
@@ -42,6 +48,13 @@ function formatMonthsRange(payment) {
         absIdx: m.year * 12 + idx
       };
     }).sort((a, b) => a.absIdx - b.absIdx);
+
+    if (items.length === 12 && (items[11].absIdx - items[0].absIdx === 11) && items[0].absIdx % 12 === 3) {
+      const sessionStartYear = Math.floor(items[0].absIdx / 12);
+      const startShort = String(sessionStartYear).slice(-2);
+      const nextYearShort = String(sessionStartYear + 1).slice(-2);
+      return `${startShort}-${nextYearShort}`;
+    }
 
     const ranges = [];
     let start = items[0];
@@ -53,9 +66,16 @@ function formatMonthsRange(payment) {
         prev = curr;
       } else {
         if (start.absIdx === prev.absIdx) {
-          ranges.push(start.month);
+          const yr = String(start.year).slice(-2);
+          ranges.push(`${shortMonths[start.month] || start.month} '${yr}`);
         } else {
-          ranges.push(`${start.month}-${prev.month}`);
+          const yrStart = String(start.year).slice(-2);
+          const yrPrev = String(prev.year).slice(-2);
+          if (yrStart === yrPrev) {
+            ranges.push(`${shortMonths[start.month] || start.month}-${shortMonths[prev.month] || prev.month} '${yrStart}`);
+          } else {
+            ranges.push(`${shortMonths[start.month] || start.month} '${yrStart}-${shortMonths[prev.month] || prev.month} '${yrPrev}`);
+          }
         }
         start = curr;
         prev = curr;
@@ -63,12 +83,28 @@ function formatMonthsRange(payment) {
     }
 
     if (start.absIdx === prev.absIdx) {
-      ranges.push(start.month);
+      const yr = String(start.year).slice(-2);
+      ranges.push(`${shortMonths[start.month] || start.month} '${yr}`);
     } else {
-      ranges.push(`${start.month}-${prev.month}`);
+      const yrStart = String(start.year).slice(-2);
+      const yrPrev = String(prev.year).slice(-2);
+      if (yrStart === yrPrev) {
+        ranges.push(`${shortMonths[start.month] || start.month}-${shortMonths[prev.month] || prev.month} '${yrStart}`);
+      } else {
+        ranges.push(`${shortMonths[start.month] || start.month} '${yrStart}-${shortMonths[prev.month] || prev.month} '${yrPrev}`);
+      }
     }
 
     return ranges.join(', ');
+  }
+
+  if (payment.month && payment.month.includes('-')) {
+    const [yStr, mStr] = payment.month.split('-');
+    const monthIndex = parseInt(mStr, 10);
+    const monthNamesList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    if (monthIndex >= 1 && monthIndex <= 12) {
+      return monthNamesList[monthIndex - 1];
+    }
   }
 
   return payment.month ? formatMonthLabel(payment.month) : 'Onetime';
@@ -247,9 +283,9 @@ export default function StudentProfile() {
 
     const grid = [];
     for (const m of monthsInSession) {
-      const ym = `${selectedSession}-${m}`;
       const monthNum = parseInt(m, 10);
       const calYear = monthNum >= 4 ? selectedSession : selectedSession + 1;
+      const ym = `${calYear}-${m}`;
       const curr = new Date(calYear, monthNum - 1, 1);
 
       const isPaid = payments.some(p => {

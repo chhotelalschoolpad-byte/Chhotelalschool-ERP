@@ -143,7 +143,9 @@ export default function CollectFeePage() {
         const monthsInSession = ["04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02", "03"];
         let foundUnpaid = false;
         for (const m of monthsInSession) {
-          const ym = `${currentSessionYear}-${m}`;
+          const monthNum = parseInt(m, 10);
+          const calYear = monthNum >= 4 ? currentSessionYear : currentSessionYear + 1;
+          const ym = `${calYear}-${m}`;
           if (!checkYMPaid(ym)) {
             setSelectedMonthsSet(new Set([ym]));
             foundUnpaid = true;
@@ -180,9 +182,9 @@ export default function CollectFeePage() {
 
     const grid = [];
     for (const m of monthsInSession) {
-      const ym = `${selectedSession}-${m}`;
       const monthNum = parseInt(m, 10);
       const calYear = monthNum >= 4 ? selectedSession : selectedSession + 1;
+      const ym = `${calYear}-${m}`;
       const curr = new Date(calYear, monthNum - 1, 1);
 
       // Check if paid
