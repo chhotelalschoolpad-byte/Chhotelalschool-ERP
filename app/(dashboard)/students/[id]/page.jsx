@@ -51,9 +51,8 @@ function formatMonthsRange(payment) {
 
     if (items.length === 12 && (items[11].absIdx - items[0].absIdx === 11) && items[0].absIdx % 12 === 3) {
       const sessionStartYear = Math.floor(items[0].absIdx / 12);
-      const startShort = String(sessionStartYear).slice(-2);
       const nextYearShort = String(sessionStartYear + 1).slice(-2);
-      return `${startShort}-${nextYearShort}`;
+      return `${sessionStartYear}-${nextYearShort}`;
     }
 
     const ranges = [];
