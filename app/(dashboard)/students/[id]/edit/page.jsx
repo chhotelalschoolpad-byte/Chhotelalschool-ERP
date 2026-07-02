@@ -11,7 +11,7 @@ export default function EditStudentPage() {
   const router = useRouter();
   const { student, isLoading, error } = useStudent(id);
 
-  if (isLoading) {
+  if (!id || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />

@@ -22,6 +22,50 @@ const fmt = (amt) =>
     maximumFractionDigits: 0,
   }).format(amt || 0);
 
+const getJoiningYear = (admissionNumber) => {
+  if (!admissionNumber) return new Date().getFullYear();
+  const parts = admissionNumber.split("-");
+  for (const part of parts) {
+    const y = parseInt(part, 10);
+    if (!isNaN(y) && y >= 1000 && y <= 9999) {
+      return y;
+    }
+  }
+  const firstPart = parseInt(parts[0], 10);
+  return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
+};
+
+const ALL_CLASSES = [
+  'LKG', 'UKG', 
+  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 
+  'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 
+  'Class 11', 'Class 12'
+];
+
+function getPromotedClass(originalClass, diff) {
+  if (!originalClass) return '';
+  if (diff <= 0) return originalClass;
+  
+  const norm = (c) => c.toLowerCase().replace(/\s+/g, '');
+  const index = ALL_CLASSES.findIndex(c => norm(c) === norm(originalClass));
+  
+  if (index === -1) {
+    const match = originalClass.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      const promotedNum = num + diff;
+      return originalClass.replace(/\d+/, promotedNum);
+    }
+    return originalClass;
+  }
+  
+  const targetIndex = index + diff;
+  if (targetIndex >= ALL_CLASSES.length) {
+    return 'Alumni';
+  }
+  return ALL_CLASSES[targetIndex];
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const { total } = useStudents('?limit=1');
@@ -294,7 +338,13 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td className="px-6 py-4"><Badge text={student.admissionNumber} /></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{student.className}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {(() => {
+                        const jYear = student.joiningYear || getJoiningYear(student.admissionNumber);
+                        const diff = selectedSession - jYear;
+                        return getPromotedClass(student.className, diff);
+                      })()}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col items-start gap-1">
                         {student.isMonthlyPending ? (

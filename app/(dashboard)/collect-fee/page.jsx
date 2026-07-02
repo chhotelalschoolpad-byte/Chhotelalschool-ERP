@@ -91,8 +91,6 @@ export default function CollectFeePage() {
     }
   }, [router, studentId]);
 
-  const activeFeeStructure = feeStructure?.find(f => f.className === student?.className);
-
   const getJoiningYear = (admissionNumber) => {
     if (!admissionNumber) return new Date().getFullYear();
     const parts = admissionNumber.split("-");
@@ -106,10 +104,51 @@ export default function CollectFeePage() {
     return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
   };
 
+  const ALL_CLASSES = [
+    'LKG', 'UKG', 
+    'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 
+    'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 
+    'Class 11', 'Class 12'
+  ];
+
+  function getPromotedClass(originalClass, diff) {
+    if (!originalClass) return '';
+    if (diff <= 0) return originalClass;
+    
+    const norm = (c) => c.toLowerCase().replace(/\s+/g, '');
+    const index = ALL_CLASSES.findIndex(c => norm(c) === norm(originalClass));
+    
+    if (index === -1) {
+      const match = originalClass.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        const promotedNum = num + diff;
+        return originalClass.replace(/\d+/, promotedNum);
+      }
+      return originalClass;
+    }
+    
+    const targetIndex = index + diff;
+    if (targetIndex >= ALL_CLASSES.length) {
+      return 'Alumni';
+    }
+    return ALL_CLASSES[targetIndex];
+  }
+
   const joiningYear = useMemo(() => {
+    if (student?.joiningYear) return student.joiningYear;
     if (!student?.admissionNumber) return null;
     return getJoiningYear(student.admissionNumber);
-  }, [student?.admissionNumber]);
+  }, [student?.joiningYear, student?.admissionNumber]);
+
+  const displayedClassName = useMemo(() => {
+    if (!student || !selectedSession) return student?.className || '';
+    const jYear = student.joiningYear || (student.admissionNumber ? getJoiningYear(student.admissionNumber) : new Date().getFullYear());
+    const diff = selectedSession - jYear;
+    return getPromotedClass(student.className, diff);
+  }, [student, selectedSession]);
+
+  const activeFeeStructure = feeStructure?.find(f => f.className === displayedClassName);
 
   useEffect(() => {
     if (student) {
@@ -120,9 +159,11 @@ export default function CollectFeePage() {
 
   const sessions = useMemo(() => {
     const list = [];
-    const startYear = currentSessionYear - 10;
-    const endYear = currentSessionYear + 1;
-    for (let y = startYear; y <= endYear; y++) {
+    const startYear = joiningYear ? joiningYear : currentSessionYear - 10;
+    const endYear = currentSessionYear;
+    const actualStart = Math.min(startYear, endYear);
+    const actualEnd = Math.max(startYear, endYear);
+    for (let y = actualStart; y <= actualEnd; y++) {
       const nextYearShort = String(y + 1).slice(-2);
       list.push({
         year: y,
@@ -130,7 +171,7 @@ export default function CollectFeePage() {
       });
     }
     return list;
-  }, [currentSessionYear]);
+  }, [joiningYear, currentSessionYear]);
 
   const monthGrid = useMemo(() => {
     if (!student || !selectedSession) return [];
@@ -486,7 +527,7 @@ export default function CollectFeePage() {
                         <h2 className="text-xl font-black text-gray-900">{student.fullName}</h2>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                             <Zap size={12} /> {student.admissionNumber} • {student.className}
+                             <Zap size={12} /> {student.admissionNumber} • {displayedClassName}
                           </p>
                           {student.isFeeExempt && (
                             <span className="bg-blue-50 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-lg border border-blue-100 flex items-center gap-1 uppercase">

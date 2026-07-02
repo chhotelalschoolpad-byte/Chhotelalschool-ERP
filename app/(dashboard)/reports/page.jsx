@@ -97,6 +97,50 @@ function formatMonthsRange(payment) {
   return payment.month ? formatMonthLabel(payment.month) : 'Onetime';
 }
 
+const getJoiningYear = (admissionNumber) => {
+  if (!admissionNumber) return new Date().getFullYear();
+  const parts = admissionNumber.split("-");
+  for (const part of parts) {
+    const y = parseInt(part, 10);
+    if (!isNaN(y) && y >= 1000 && y <= 9999) {
+      return y;
+    }
+  }
+  const firstPart = parseInt(parts[0], 10);
+  return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
+};
+
+const ALL_CLASSES = [
+  'LKG', 'UKG', 
+  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 
+  'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 
+  'Class 11', 'Class 12'
+];
+
+function getPromotedClass(originalClass, diff) {
+  if (!originalClass) return '';
+  if (diff <= 0) return originalClass;
+  
+  const norm = (c) => c.toLowerCase().replace(/\s+/g, '');
+  const index = ALL_CLASSES.findIndex(c => norm(c) === norm(originalClass));
+  
+  if (index === -1) {
+    const match = originalClass.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      const promotedNum = num + diff;
+      return originalClass.replace(/\d+/, promotedNum);
+    }
+    return originalClass;
+  }
+  
+  const targetIndex = index + diff;
+  if (targetIndex >= ALL_CLASSES.length) {
+    return 'Alumni';
+  }
+  return ALL_CLASSES[targetIndex];
+}
+
 const fetcher = url => fetch(url).then(r => r.json());
 
 export default function ReportsPage() {
@@ -373,7 +417,13 @@ export default function ReportsPage() {
                         >
                           <td className="px-4 py-1.5 font-bold text-gray-800">{s.fullName}</td>
                           <td className="px-4 py-1.5 font-mono text-[11px] text-gray-500">{s.admissionNumber}</td>
-                          <td className="px-4 py-1.5 text-gray-600">{s.className}</td>
+                          <td className="px-4 py-1.5 text-gray-600">
+                            {(() => {
+                              const jYear = getJoiningYear(s.admissionNumber);
+                              const diff = selectedSession - jYear;
+                              return getPromotedClass(s.className, diff);
+                            })()}
+                          </td>
                           <td className="px-4 py-1.5 text-gray-500">{s.mobile1}</td>
                           <td className="px-4 py-1.5 whitespace-nowrap">
                             <div className="flex flex-col items-start gap-1">

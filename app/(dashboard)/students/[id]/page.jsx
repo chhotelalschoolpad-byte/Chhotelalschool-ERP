@@ -122,6 +122,37 @@ const getJoiningYear = (admissionNumber) => {
   return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
 };
 
+const ALL_CLASSES = [
+  'LKG', 'UKG', 
+  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 
+  'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 
+  'Class 11', 'Class 12'
+];
+
+function getPromotedClass(originalClass, diff) {
+  if (!originalClass) return '';
+  if (diff <= 0) return originalClass;
+  
+  const norm = (c) => c.toLowerCase().replace(/\s+/g, '');
+  const index = ALL_CLASSES.findIndex(c => norm(c) === norm(originalClass));
+  
+  if (index === -1) {
+    const match = originalClass.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      const promotedNum = num + diff;
+      return originalClass.replace(/\d+/, promotedNum);
+    }
+    return originalClass;
+  }
+  
+  const targetIndex = index + diff;
+  if (targetIndex >= ALL_CLASSES.length) {
+    return 'Alumni';
+  }
+  return ALL_CLASSES[targetIndex];
+}
+
 const getSessionBounds = (sessionStartYear) => {
   const year = Number(sessionStartYear);
   return {
@@ -163,15 +194,24 @@ export default function StudentProfile() {
   }, [id, currentSessionYear]);
 
   const joiningYear = useMemo(() => {
+    if (student?.joiningYear) return student.joiningYear;
     if (!student?.admissionNumber) return null;
     return getJoiningYear(student.admissionNumber);
-  }, [student?.admissionNumber]);
+  }, [student?.joiningYear, student?.admissionNumber]);
+
+  const displayedClassName = useMemo(() => {
+    if (!student || !joiningYear || !selectedSession) return student?.className || '';
+    const diff = selectedSession - joiningYear;
+    return getPromotedClass(student.className, diff);
+  }, [student, joiningYear, selectedSession]);
 
   const sessions = useMemo(() => {
     const list = [];
-    const startYear = currentSessionYear - 10;
-    const endYear = currentSessionYear + 1;
-    for (let y = startYear; y <= endYear; y++) {
+    const startYear = joiningYear ? joiningYear : currentSessionYear - 10;
+    const endYear = currentSessionYear;
+    const actualStart = Math.min(startYear, endYear);
+    const actualEnd = Math.max(startYear, endYear);
+    for (let y = actualStart; y <= actualEnd; y++) {
       const nextYearShort = String(y + 1).slice(-2);
       list.push({
         year: y,
@@ -179,7 +219,7 @@ export default function StudentProfile() {
       });
     }
     return list;
-  }, [currentSessionYear]);
+  }, [joiningYear, currentSessionYear]);
 
   // -- Fetch Fee Structure --
   useEffect(() => {
@@ -192,8 +232,8 @@ export default function StudentProfile() {
   }, []);
 
   const activeFeeStructure = useMemo(() =>
-    feeStructure?.find(f => f.className === student?.className),
-    [feeStructure, student]);
+    feeStructure?.find(f => f.className === displayedClassName),
+    [feeStructure, displayedClassName]);
 
   useEffect(() => {
     if (id) {
@@ -359,7 +399,7 @@ export default function StudentProfile() {
     setPaymentToArchive(null);
   };
 
-  if (isLoading) return <div className="p-20 text-center font-black animate-pulse text-blue-600">LOADING PROFILE...</div>;
+  if (!id || isLoading) return <div className="p-20 text-center font-black animate-pulse text-blue-600">LOADING PROFILE...</div>;
   if (!student) return <div className="p-20 text-center font-black text-red-600">STUDENT NOT FOUND</div>;
 
   return (
@@ -431,7 +471,7 @@ export default function StudentProfile() {
               <Layers size={18} className="text-blue-500 shrink-0" />
               <p className="text-sm font-bold text-gray-900">
                 <span className="text-[10px] uppercase text-gray-400 tracking-widest mr-2">Class:</span>
-                {student.className}
+                {displayedClassName}
               </p>
             </div>
 

@@ -4,6 +4,50 @@ import {
   Document, Page, Text, View, StyleSheet, Image,
 } from '@react-pdf/renderer';
 
+const getJoiningYear = (admissionNumber) => {
+  if (!admissionNumber || admissionNumber === '--') return new Date().getFullYear();
+  const parts = admissionNumber.split("-");
+  for (const part of parts) {
+    const y = parseInt(part, 10);
+    if (!isNaN(y) && y >= 1000 && y <= 9999) {
+      return y;
+    }
+  }
+  const firstPart = parseInt(parts[0], 10);
+  return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
+};
+
+const ALL_CLASSES = [
+  'LKG', 'UKG', 
+  'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 
+  'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 
+  'Class 11', 'Class 12'
+];
+
+function getPromotedClass(originalClass, diff) {
+  if (!originalClass || originalClass === '--') return originalClass;
+  if (diff <= 0) return originalClass;
+  
+  const norm = (c) => c.toLowerCase().replace(/\s+/g, '');
+  const index = ALL_CLASSES.findIndex(c => norm(c) === norm(originalClass));
+  
+  if (index === -1) {
+    const match = originalClass.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      const promotedNum = num + diff;
+      return originalClass.replace(/\d+/, promotedNum);
+    }
+    return originalClass;
+  }
+  
+  const targetIndex = index + diff;
+  if (targetIndex >= ALL_CLASSES.length) {
+    return 'Alumni';
+  }
+  return ALL_CLASSES[targetIndex];
+}
+
 const styles = StyleSheet.create({
   page: {
     padding: 30,
@@ -174,12 +218,13 @@ export default function ReceiptPDF({ payment, student, settings }) {
   const {
     fullName        = '--',
     admissionNumber = '--',
-    className       = '--',
+    className: baseClassName = '--',
     fatherName      = '--',
     motherName      = '--',
     mobile1         = '--',
     previousDue     = 0,
     previousDuePaid = 0,
+    joiningYear: studentJoiningYear,
   } = student || {};
 
   // Session Logic
@@ -197,6 +242,11 @@ export default function ReceiptPDF({ payment, student, settings }) {
     return `${y - 1}-${y.toString().slice(-2)}`;
   };
   const sessionStr = getSession();
+
+  const jYear = studentJoiningYear || getJoiningYear(admissionNumber);
+  const paySessionStartYear = parseInt(sessionStr.split('-')[0], 10);
+  const diff = isNaN(paySessionStartYear) || isNaN(jYear) ? 0 : paySessionStartYear - jYear;
+  const className = getPromotedClass(baseClassName, diff);
   const printDate = new Date(paymentDate).toLocaleDateString('en-IN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
