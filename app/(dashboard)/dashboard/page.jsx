@@ -30,6 +30,27 @@ export default function Dashboard() {
   const [latePage, setLatePage] = useState(1);
   const LATE_PAGE_SIZE = 15;
 
+  const currentSessionYear = useMemo(() => {
+    const today = new Date();
+    return today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  }, []);
+
+  const [selectedSession, setSelectedSession] = useState(currentSessionYear);
+
+  const sessions = useMemo(() => {
+    const list = [];
+    const startYear = currentSessionYear - 10;
+    const endYear = currentSessionYear + 1;
+    for (let y = startYear; y <= endYear; y++) {
+      const nextYearShort = String(y + 1).slice(-2);
+      list.push({
+        year: y,
+        label: `${y}-${nextYearShort}`
+      });
+    }
+    return list;
+  }, [currentSessionYear]);
+
   const totalPages = useMemo(() => {
     return Math.ceil((lateStudents?.length || 0) / LATE_PAGE_SIZE);
   }, [lateStudents]);
@@ -47,8 +68,8 @@ export default function Dashboard() {
   }, [lateStudents, latePage]);
 
   const today = new Date().toISOString().slice(0, 10);
-  const { data: dailyReport } = useSWR(`/api/reports/daily?date=${today}`, fetcher);
-  const { data: pendingReport } = useSWR('/api/reports/pending', fetcher);
+  const { data: dailyReport } = useSWR(`/api/reports/daily?date=${today}&session=${selectedSession}`, fetcher);
+  const { data: pendingReport } = useSWR(`/api/reports/pending?session=${selectedSession}`, fetcher);
 
   const todaysCollection = dailyReport?.data?.totalCollection || 0;
   const pendingData = pendingReport?.data;
@@ -57,12 +78,25 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black text-blue-800 tracking-tight drop-shadow-sm">
             Dashboard
           </h1>
           <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] mt-1 pl-1">Overview of school operations</p>
+        </div>
+        <div>
+          <select
+            value={selectedSession}
+            onChange={(e) => setSelectedSession(Number(e.target.value))}
+            className="px-4 py-2 rounded-2xl border border-gray-200 text-xs font-black uppercase text-blue-600 bg-blue-50/50 outline-none cursor-pointer shadow-sm hover:bg-blue-50 transition-all"
+          >
+            {sessions.map(s => (
+              <option key={s.year} value={s.year} className="font-bold text-gray-700 bg-white">
+                Session {s.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

@@ -188,9 +188,18 @@ export async function getPendingReport(sessionYear) {
     0
   );
 
-  // Calculate total collection overall across all time
+  // Calculate total collection overall filtered by active session year
+  const overallWhere = { status: 'SUCCESS' };
+  if (activeSessionYear) {
+    const year = Number(activeSessionYear);
+    overallWhere.paymentDate = {
+      gte: new Date(year, 3, 1, 0, 0, 0, 0),
+      lte: new Date(year + 1, 2, 31, 23, 59, 59, 999)
+    };
+  }
+
   const overallCollectionAggregate = await prisma.payment.aggregate({
-    where: { status: 'SUCCESS' },
+    where: overallWhere,
     _sum: {
       amount:   true,
       discount: true
