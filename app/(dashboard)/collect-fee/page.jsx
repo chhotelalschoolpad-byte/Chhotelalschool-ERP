@@ -114,48 +114,7 @@ export default function CollectFeePage() {
   useEffect(() => {
     if (student) {
       setSelectedSession(currentSessionYear);
-
-      const today = new Date();
-      const currentYM = `${currentSessionYear}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-      const payments = student.payments || [];
-      const monthNamesList = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-      ];
-
-      const checkYMPaid = (ym) => {
-        return payments.some(p => {
-          if (p.status !== 'SUCCESS') return false;
-          if (p.month === ym && p.isMonthlyPaid) return true;
-          if (p.selectedMonths && Array.isArray(p.selectedMonths) && p.isMonthlyPaid) {
-            const [yStr, mStr] = ym.split('-');
-            const yearNum = parseInt(yStr, 10);
-            const monthName = monthNamesList[parseInt(mStr, 10) - 1];
-            return p.selectedMonths.some(sm => sm.year === yearNum && sm.month === monthName);
-          }
-          return false;
-        });
-      };
-
-      if (!checkYMPaid(currentYM) && !student.isFeeExempt) {
-        setSelectedMonthsSet(new Set([currentYM]));
-      } else {
-        const monthsInSession = ["04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02", "03"];
-        let foundUnpaid = false;
-        for (const m of monthsInSession) {
-          const monthNum = parseInt(m, 10);
-          const calYear = monthNum >= 4 ? currentSessionYear : currentSessionYear + 1;
-          const ym = `${calYear}-${m}`;
-          if (!checkYMPaid(ym)) {
-            setSelectedMonthsSet(new Set([ym]));
-            foundUnpaid = true;
-            break;
-          }
-        }
-        if (!foundUnpaid) {
-          setSelectedMonthsSet(new Set());
-        }
-      }
+      setSelectedMonthsSet(new Set());
     }
   }, [student, currentSessionYear]);
 
