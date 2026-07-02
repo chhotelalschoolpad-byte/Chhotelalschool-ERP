@@ -520,7 +520,10 @@ export default function CollectFeePage() {
                       {sessions.length > 0 && (
                         <select
                           value={selectedSession}
-                          onChange={(e) => setSelectedSession(Number(e.target.value))}
+                          onChange={(e) => {
+                            setSelectedSession(Number(e.target.value));
+                            setSelectedMonthsSet(new Set());
+                          }}
                           className="px-3 py-1.5 rounded-xl border border-gray-100 text-xs font-black uppercase text-blue-600 bg-blue-50 outline-none cursor-pointer"
                         >
                           {sessions.map(s => (
