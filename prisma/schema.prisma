@@ -65,6 +65,7 @@ model Payment {
   studentId          String
   admissionNumber    String
   month              String   @default("")
+  selectedMonths     Json?
   amount             Int
   discount           Int      @default(0)
   paymentMode        String

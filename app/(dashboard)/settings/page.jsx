@@ -65,7 +65,7 @@ export default function SettingsPage() {
       // Ensure only the expected fields are sent, and map classes back to strings
       const payload = {
         defaultClasses: data.defaultClasses.map(i => i.value).filter(v => v.trim() !== ""),
-        feeTypes: sysSettings?.feeTypes || ['Monthly', 'Admission', 'Exam', 'Van Charge']
+        feeTypes: sysSettings?.feeTypes || ['Monthly', 'Admission', 'Exam', 'Transport']
       };
 
       const res = await fetch('/api/settings/system', {

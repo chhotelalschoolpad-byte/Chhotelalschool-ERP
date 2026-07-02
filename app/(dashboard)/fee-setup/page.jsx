@@ -178,7 +178,7 @@ export default function FeeSetupPage() {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
-                    <Truck size={12} /> Van Charge
+                    <Truck size={12} /> Transport
                   </span>
                   <span className="font-black text-gray-900">₹{fee.vanChargeFee}</span>
                 </div>
@@ -261,7 +261,7 @@ export default function FeeSetupPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-wide">Van Charge Fee (₹)</label>
+              <label className="block text-sm font-black text-gray-700 mb-2 uppercase tracking-wide">Transport Fee (₹)</label>
               <div className="relative group">
                 <Truck className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 

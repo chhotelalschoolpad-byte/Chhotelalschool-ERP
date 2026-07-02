@@ -12,7 +12,7 @@ export async function getDailyReport(dateStr, sessionYear) {
       paymentDate: { gte: startOfDay, lte: endOfDay }
     },
     include: {
-      student: { select: { fullName: true, className: true } }
+      student: { select: { id: true, fullName: true, className: true } }
     }
   });
 
@@ -54,7 +54,7 @@ export async function getMonthlyReport(monthStr, sessionYear) {
       paymentDate: { gte: startOfMonth, lte: endOfMonth }
     },
     include: {
-      student: { select: { fullName: true, className: true } }
+      student: { select: { id: true, fullName: true, className: true } }
     }
   });
 
@@ -108,7 +108,7 @@ export async function getPendingReport(sessionYear) {
 
   const targetYMList = checkMonths.map(m => `${activeSessionYear}-${m}`);
 
-  // Fetch all students with their payments in this session
+  // Fetch all students with their payments
   const allStudents = await prisma.student.findMany({
     select: {
       id:              true,
@@ -122,18 +122,38 @@ export async function getPendingReport(sessionYear) {
       isFeeExempt:     true,
       payments: {
         where: {
-          month: { in: targetYMList },
           isMonthlyPaid: true,
           status: 'SUCCESS'
         },
-        select: { month: true }
+        select: { month: true, selectedMonths: true }
       }
     }
   });
 
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const getPaidMonthsForStudent = (s) => {
+    const paidMonths = [];
+    s.payments.forEach(p => {
+      if (p.selectedMonths && Array.isArray(p.selectedMonths)) {
+        p.selectedMonths.forEach(sm => {
+          const monthIndex = monthNames.indexOf(sm.month) + 1;
+          const monthStr = String(monthIndex).padStart(2, '0');
+          paidMonths.push(`${sm.year}-${monthStr}`);
+        });
+      } else if (p.month) {
+        paidMonths.push(p.month);
+      }
+    });
+    return paidMonths;
+  };
+
   const studentsWithMonthlyPending = allStudents.filter(s => {
     if (s.isFeeExempt) return false;
-    const paidMonths = s.payments.map(p => p.month);
+    const paidMonths = getPaidMonthsForStudent(s);
     return targetYMList.some(ym => !paidMonths.includes(ym));
   });
 
@@ -156,7 +176,7 @@ export async function getPendingReport(sessionYear) {
   // For the 'students' list returned (the table), we'll return anyone who has at least one issue
   const pendingIssueStudents = allStudents.filter(s => {
     if (s.isFeeExempt) return false;
-    const paidMonths = s.payments.map(p => p.month);
+    const paidMonths = getPaidMonthsForStudent(s);
     const isPendingThisSession = targetYMList.some(ym => !paidMonths.includes(ym));
     const hasLegacy = s.previousDue > s.previousDuePaid;
     return isPendingThisSession || hasLegacy;
@@ -186,7 +206,7 @@ export async function getPendingReport(sessionYear) {
     genderStats:           genderStats,
     statusStats:           statusStats,
     students:              pendingIssueStudents.map(s => {
-      const paidMonths = s.payments.map(p => p.month);
+      const paidMonths = getPaidMonthsForStudent(s);
       return {
         ...s,
         isMonthlyPending: targetYMList.some(ym => !paidMonths.includes(ym)),

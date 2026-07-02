@@ -1,7 +1,7 @@
 "use client"
 
 import { useSchoolSettings } from '@/hooks/useSettings';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { 
@@ -41,17 +41,29 @@ export default function CollectFeePage() {
   const [feeStructure, setFeeStructure] = useState(null);
   
   // Selection state for Fresh Payment (studentId mode)
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1).padStart(2, "0"));
+  const currentSessionYear = useMemo(() => {
+    const today = new Date();
+    return today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+  }, []);
+
+  const [selectedSession, setSelectedSession] = useState(currentSessionYear);
+  const [selectedMonthsSet, setSelectedMonthsSet] = useState(new Set());
   const [selectedTypes, setSelectedTypes] = useState(new Set(["Monthly Fee"]));
   const [prevDueAmount, setPrevDueAmount] = useState(0);
   const [vanAmount, setVanAmount] = useState(0);
+  const [admissionAmount, setAdmissionAmount] = useState(0);
+  const [examAmount, setExamAmount] = useState(0);
 
   const [paymentMode, setPaymentMode] = useState('Cash');
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+
+  const monthNames = useMemo(() => [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ], []);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('pendingPayment');
@@ -81,17 +93,167 @@ export default function CollectFeePage() {
 
   const activeFeeStructure = feeStructure?.find(f => f.className === student?.className);
 
+  const getJoiningYear = (admissionNumber) => {
+    if (!admissionNumber) return new Date().getFullYear();
+    const parts = admissionNumber.split("-");
+    for (const part of parts) {
+      const y = parseInt(part, 10);
+      if (!isNaN(y) && y >= 1000 && y <= 9999) {
+        return y;
+      }
+    }
+    const firstPart = parseInt(parts[0], 10);
+    return isNaN(firstPart) ? new Date().getFullYear() : firstPart;
+  };
+
+  const joiningYear = useMemo(() => {
+    if (!student?.admissionNumber) return null;
+    return getJoiningYear(student.admissionNumber);
+  }, [student?.admissionNumber]);
+
+  useEffect(() => {
+    if (student) {
+      setSelectedSession(currentSessionYear);
+
+      const today = new Date();
+      const currentYM = `${currentSessionYear}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+      const payments = student.payments || [];
+      const monthNamesList = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      const checkYMPaid = (ym) => {
+        return payments.some(p => {
+          if (p.status !== 'SUCCESS') return false;
+          if (p.month === ym && p.isMonthlyPaid) return true;
+          if (p.selectedMonths && Array.isArray(p.selectedMonths) && p.isMonthlyPaid) {
+            const [yStr, mStr] = ym.split('-');
+            const yearNum = parseInt(yStr, 10);
+            const monthName = monthNamesList[parseInt(mStr, 10) - 1];
+            return p.selectedMonths.some(sm => sm.year === yearNum && sm.month === monthName);
+          }
+          return false;
+        });
+      };
+
+      if (!checkYMPaid(currentYM) && !student.isFeeExempt) {
+        setSelectedMonthsSet(new Set([currentYM]));
+      } else {
+        const monthsInSession = ["04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02", "03"];
+        let foundUnpaid = false;
+        for (const m of monthsInSession) {
+          const ym = `${currentSessionYear}-${m}`;
+          if (!checkYMPaid(ym)) {
+            setSelectedMonthsSet(new Set([ym]));
+            foundUnpaid = true;
+            break;
+          }
+        }
+        if (!foundUnpaid) {
+          setSelectedMonthsSet(new Set());
+        }
+      }
+    }
+  }, [student, currentSessionYear]);
+
+  const sessions = useMemo(() => {
+    if (joiningYear === null) return [];
+    const list = [];
+    for (let y = joiningYear; y <= currentSessionYear; y++) {
+      const nextYearShort = String(y + 1).slice(-2);
+      list.push({
+        year: y,
+        label: `${y}-${nextYearShort}`
+      });
+    }
+    return list;
+  }, [joiningYear, currentSessionYear]);
+
+  const monthGrid = useMemo(() => {
+    if (!student || !selectedSession) return [];
+    
+    const today = new Date();
+    const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthsInSession = ["04", "05", "06", "07", "08", "09", "10", "11", "12", "01", "02", "03"];
+    const payments = student.payments || [];
+
+    const grid = [];
+    for (const m of monthsInSession) {
+      const ym = `${selectedSession}-${m}`;
+      const monthNum = parseInt(m, 10);
+      const calYear = monthNum >= 4 ? selectedSession : selectedSession + 1;
+      const curr = new Date(calYear, monthNum - 1, 1);
+
+      // Check if paid
+      const isPaid = payments.some(p => {
+        if (p.status !== 'SUCCESS') return false;
+        if (p.month === ym && p.isMonthlyPaid) return true;
+        if (p.selectedMonths && Array.isArray(p.selectedMonths) && p.isMonthlyPaid) {
+          const [yStr, mStr] = ym.split('-');
+          const yearNum = parseInt(yStr, 10);
+          const monthIndex = parseInt(mStr, 10);
+          const monthName = monthNames[monthIndex - 1];
+          return p.selectedMonths.some(sm => 
+            sm.year === yearNum && 
+            (sm.month === monthName || sm.month === mStr || String(sm.month).padStart(2, '0') === mStr)
+          );
+        }
+        return false;
+      });
+
+      const isPast = curr < currentMonthStart;
+      const isFuture = curr > currentMonthStart;
+
+      let state = "gray"; // Future/Pending
+      if (student.isFeeExempt) {
+        state = "blue"; // EXEMPT
+      } else if (isPaid) {
+        state = "green"; // Emerald
+      } else if (isPast) {
+        state = "red";   // Rose (Past-due)
+      } else if (!isFuture) {
+        state = "red";   // Current month (Past-due if not paid)
+      }
+
+      grid.push({
+        label: curr.toLocaleString("en-IN", { month: "short" }),
+        monthName: monthNames[monthNum - 1],
+        year: calYear,
+        ym,
+        state
+      });
+    }
+    return grid;
+  }, [student, selectedSession, monthNames]);
+
+  const handleMonthToggle = (m) => {
+    if (m.state === 'green' || m.state === 'blue') return; // Cannot select Paid or Exempt
+    
+    const next = new Set(selectedMonthsSet);
+    if (next.has(m.ym)) {
+      next.delete(m.ym);
+    } else {
+      next.add(m.ym);
+    }
+    setSelectedMonthsSet(next);
+  };
+
   useEffect(() => {
     if (activeFeeStructure) {
       setVanAmount(activeFeeStructure.vanChargeFee || 0);
+      setAdmissionAmount(activeFeeStructure.admissionFee || 0);
+      setExamAmount(activeFeeStructure.examFee || 0);
     }
   }, [activeFeeStructure]);
   
+  const selectedMonthsCount = selectedMonthsSet.size;
+
   const types = [
-    { label: "Monthly Fee", amount: activeFeeStructure?.monthlyFee || 0 },
-    { label: "Van Charge", amount: vanAmount },
-    { label: "Admission Fee", amount: activeFeeStructure?.admissionFee || 0 },
-    { label: "Exam Fee", amount: activeFeeStructure?.examFee || 0 },
+    { label: "Monthly Fee", amount: (activeFeeStructure?.monthlyFee || 0) * selectedMonthsCount, rate: activeFeeStructure?.monthlyFee || 0, isPerMonth: true },
+    { label: "Transport", amount: vanAmount, rate: vanAmount, isPerMonth: false },
+    { label: "Admission Fee", amount: admissionAmount, rate: admissionAmount, isPerMonth: false },
+    { label: "Exam Fee", amount: examAmount, rate: examAmount, isPerMonth: false },
   ];
 
   if (!payload && !student) return <div className="p-12 text-center text-gray-400 font-bold">Initializing transaction...</div>;
@@ -108,17 +270,66 @@ export default function CollectFeePage() {
     successReturnUrl = `/students/${payload.studentId}`;
     allItems = [
       ...(payload.previousDueAmount > 0 
-        ? [{ feeType: 'Legacy Carry-Forward Due', month: null, amount: payload.previousDueAmount }] 
+        ? [{ feeType: 'Legacy Carry-Forward Due', monthLabel: null, amount: payload.previousDueAmount }] 
         : []),
-      ...payload.selectedFees,
+      ...payload.selectedFees.map(f => ({ feeType: f.type, monthLabel: f.month, amount: f.amount })),
     ];
   } else {
     currentStudentId = student.id;
     successReturnUrl = `/students/${student.id}`;
-    allItems = [
-      ...types.filter(t => selectedTypes.has(t.label)).map(t => ({ feeType: t.label, month: `${year}-${month}`, amount: t.amount })),
-      ...(prevDueAmount > 0 ? [{ feeType: 'Legacy Due Payment', month: null, amount: prevDueAmount }] : [])
-    ];
+    
+    const itemsList = [];
+    
+    // Monthly Fee
+    if (selectedTypes.has("Monthly Fee") && (activeFeeStructure?.monthlyFee || 0) > 0) {
+      selectedMonthsSet.forEach(ym => {
+        const [y, m] = ym.split('-');
+        const mName = monthNames[parseInt(m, 10) - 1];
+        itemsList.push({
+          feeType: "Monthly Fee",
+          monthLabel: `${mName} ${y}`,
+          amount: activeFeeStructure.monthlyFee
+        });
+      });
+    }
+
+    // Transport
+    if (selectedTypes.has("Transport") && vanAmount > 0) {
+      itemsList.push({
+        feeType: "Transport",
+        monthLabel: "Onetime Fee",
+        amount: vanAmount
+      });
+    }
+
+    // Admission
+    if (selectedTypes.has("Admission Fee") && admissionAmount > 0) {
+      itemsList.push({
+        feeType: "Admission Fee",
+        monthLabel: "Onetime Fee",
+        amount: admissionAmount
+      });
+    }
+
+    // Exam
+    if (selectedTypes.has("Exam Fee") && examAmount > 0) {
+      itemsList.push({
+        feeType: "Exam Fee",
+        monthLabel: "Onetime Fee",
+        amount: examAmount
+      });
+    }
+
+    // Legacy Due Payment
+    if (prevDueAmount > 0) {
+      itemsList.push({
+        feeType: "Legacy Due Payment",
+        monthLabel: "Onetime Fee",
+        amount: prevDueAmount
+      });
+    }
+
+    allItems = itemsList;
   }
 
   const baseAmount = allItems.reduce((s, i) => s + i.amount, 0);
@@ -130,6 +341,11 @@ export default function CollectFeePage() {
       toast.error("Total amount must be greater than zero");
       return;
     }
+    if (!payload && selectedTypes.has("Monthly Fee") && selectedMonthsSet.size === 0) {
+      toast.error("Please select at least one month in the visualizer grid for Monthly Fee.");
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -137,20 +353,47 @@ export default function CollectFeePage() {
       if (payload) {
         bodyData = {
           studentId: payload.studentId,
-          month: payload.month || "", // Added default to empty string if missing
+          month: payload.month || "",
           paymentMode,
           discount: Number(safeDiscount),
-          selectedItems: payload.selectedFees || [], // Renamed here
+          selectedItems: payload.selectedFees || [],
           previousDueAmount: Number(payload.previousDueAmount || 0),
         };
       } else {
+        const payloadMonths = Array.from(selectedMonthsSet).map(ym => {
+          const [y, m] = ym.split('-');
+          const mIndex = parseInt(m, 10);
+          return {
+            month: monthNames[mIndex - 1],
+            year: parseInt(y, 10)
+          };
+        });
+
+        const payloadItems = types.filter(t => selectedTypes.has(t.label) && (t.isPerMonth ? selectedMonthsSet.size > 0 : true)).map(t => {
+          const itemMonths = t.isPerMonth 
+            ? Array.from(selectedMonthsSet).map(ym => {
+                const [y, m] = ym.split('-');
+                const mIndex = parseInt(m, 10);
+                return monthNames[mIndex - 1];
+              })
+            : undefined;
+
+          return {
+            type: t.label === "Monthly Fee" ? "MONTHLY" : (t.label === "Transport" ? "TRANSPORT" : t.label === "Admission Fee" ? "ADMISSION" : "EXAM"),
+            months: itemMonths,
+            rate: t.rate,
+            quantity: t.isPerMonth ? selectedMonthsSet.size : 1,
+            total: t.amount
+          };
+        });
+
         bodyData = {
           studentId: student.id,
-          month: `${year}-${month}`,
+          months: payloadMonths,
+          paymentItems: payloadItems,
           paymentMode,
           discount: safeDiscount,
-          previousDueAmount: Number(prevDueAmount),
-          selectedItems: types.filter(t => selectedTypes.has(t.label)).map(t => ({ type: t.label, amount: t.amount }))
+          previousDueAmount: Number(prevDueAmount)
         };
       }
 
@@ -166,6 +409,11 @@ export default function CollectFeePage() {
       setResult(data);
       sessionStorage.removeItem('pendingPayment');
       toast.success('Payment Recorded Successfully!');
+
+      // Revalidate SWR key for this student
+      if (student?.id) {
+        globalMutate(`/api/students/${student.id}`);
+      }
 
       // Global revalidation to sync Dashboard & Reports
       globalMutate(key => 
@@ -299,30 +547,59 @@ export default function CollectFeePage() {
                     <div>
                       <p className="text-sm font-black text-blue-800 uppercase tracking-widest mb-1">Fee Exemption Active</p>
                       <p className="text-xs font-bold text-blue-600 leading-relaxed">
-                        This student is exempt from standard monthly fees. Only record a payment if they are paying for optional services like Van, Exams, or specific extras.
+                        This student is exempt from standard monthly fees. Only record a payment if they are paying for optional services like Transport, Exams, or specific extras.
                       </p>
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Target Year</label>
-                      <select value={year} onChange={e => setYear(e.target.value)} className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 font-bold px-4">
-                        {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map(y => (
-                          <option key={y} value={y}>{y}</option>
-                        ))}
-                      </select>
-                   </div>
-                   <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Target Month</label>
-                      <select value={month} onChange={e => setMonth(e.target.value)} className="w-full h-12 rounded-xl border-gray-200 bg-gray-50 font-bold px-4">
-                         {["01","02","03","04","05","06","07","08","09","10","11","12"].map(m => (
-                            <option key={m} value={m}>{new Date(2024, parseInt(m)-1).toLocaleString('en-IN', {month: 'long'})}</option>
-                         ))}
-                      </select>
-                   </div>
-                </div>
+                 <div className="space-y-4 pt-2">
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-100">
+                      <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Select Months to Pay</p>
+                      {sessions.length > 0 && (
+                        <select
+                          value={selectedSession}
+                          onChange={(e) => setSelectedSession(Number(e.target.value))}
+                          className="px-3 py-1.5 rounded-xl border border-gray-100 text-xs font-black uppercase text-blue-600 bg-blue-50 outline-none cursor-pointer"
+                        >
+                          {sessions.map(s => (
+                            <option key={s.year} value={s.year} className="font-bold text-gray-700 bg-white">
+                              Session {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {monthGrid.map(m => {
+                        const isSelected = selectedMonthsSet.has(m.ym);
+                        return (
+                          <div 
+                            key={m.ym} 
+                            onClick={() => handleMonthToggle(m)}
+                            className={`group relative rounded-2xl p-4 border transition-all cursor-pointer text-center ${
+                              m.state === 'green' ? 'bg-emerald-50 border-emerald-100 text-emerald-600 cursor-not-allowed opacity-65' :
+                              m.state === 'blue' ? 'bg-blue-50 border-blue-100 text-blue-600 cursor-not-allowed opacity-65' :
+                              isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-100' :
+                              m.state === 'red' ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100/50' :
+                              'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'
+                            }`}
+                          >
+                            <p className="text-[9px] font-black uppercase opacity-60">{m.year}</p>
+                            <p className="text-sm font-black">{m.label}</p>
+                            
+                            {/* Tooltip detail */}
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                              <div className="bg-gray-900 text-white text-[8px] font-bold px-2 py-1 rounded-lg whitespace-nowrap shadow-xl uppercase tracking-widest">
+                                {m.state === 'green' ? 'Paid' : m.state === 'blue' ? 'Exempt' : isSelected ? 'Selected' : m.state === 'red' ? 'Pending' : 'Upcoming'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                 </div>
 
                 <div className="space-y-4">
                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Fee Type Selection</p>
@@ -331,34 +608,50 @@ export default function CollectFeePage() {
                          <label key={t.label} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${
                             selectedTypes.has(t.label) ? 'border-blue-600 bg-blue-50' : 'border-gray-50 bg-gray-50/50 hover:bg-gray-100'
                          }`}>
-                            <div className="flex items-center gap-3">
-                               <input 
-                                  type="checkbox" 
-                                  checked={selectedTypes.has(t.label)} 
-                                  onChange={() => {
-                                     const next = new Set(selectedTypes);
-                                     if (next.has(t.label)) next.delete(t.label); else next.add(t.label);
-                                     setSelectedTypes(next);
-                                  }}
-                                  className="h-5 w-5 rounded-md border-gray-300 text-blue-600"
-                               />
-                               <span className="font-bold text-gray-800 text-sm">{t.label}</span>
-                            </div>
-                            {t.label === "Van Charge" && canAdjust ? (
-                               <div className="relative group/van cursor-text">
-                                 <input 
-                                   type="number"
-                                   value={vanAmount === 0 ? '' : vanAmount}
-                                   onClick={(e) => e.stopPropagation()}
-                                   onChange={(e) => setVanAmount(Number(e.target.value))}
-                                   className="w-24 h-10 bg-white border border-gray-200 rounded-xl px-3 text-right font-black text-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                                   placeholder="0"
-                                 />
-                                 <span className="absolute -top-6 right-0 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover/van:opacity-100 transition-opacity">Adjust Fee</span>
-                               </div>
-                            ) : (
-                               <span className="font-black text-gray-900">{fmt(t.amount)}</span>
-                            )}
+                             <div className="flex items-center gap-3">
+                                <input 
+                                   type="checkbox" 
+                                   checked={selectedTypes.has(t.label)} 
+                                   onChange={() => {
+                                      const next = new Set(selectedTypes);
+                                      if (next.has(t.label)) next.delete(t.label); else next.add(t.label);
+                                      setSelectedTypes(next);
+                                   }}
+                                   className="h-5 w-5 rounded-md border-gray-300 text-blue-600"
+                                />
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-gray-800 text-sm">{t.label}</span>
+                                  <span className="text-xs text-gray-400 font-bold">₹{t.rate}{t.isPerMonth ? '/month' : ''}</span>
+                                </div>
+                             </div>
+                             {(t.label === "Transport" || t.label === "Admission Fee" || t.label === "Exam Fee") && canAdjust ? (
+                                <div className="relative group/adjust cursor-text">
+                                  <input 
+                                    type="number"
+                                    value={
+                                      t.label === "Transport" ? (vanAmount === 0 ? '' : vanAmount) :
+                                      t.label === "Admission Fee" ? (admissionAmount === 0 ? '' : admissionAmount) :
+                                      (examAmount === 0 ? '' : examAmount)
+                                    }
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value);
+                                      if (t.label === "Transport") {
+                                        setVanAmount(val);
+                                      } else if (t.label === "Admission Fee") {
+                                        setAdmissionAmount(val);
+                                      } else {
+                                        setExamAmount(val);
+                                      }
+                                    }}
+                                    className="w-24 h-10 bg-white border border-gray-200 rounded-xl px-3 text-right font-black text-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                    placeholder="0"
+                                  />
+                                  <span className="absolute -top-6 right-0 text-[8px] font-black text-blue-500 uppercase tracking-widest opacity-0 group-hover/adjust:opacity-100 transition-opacity">Adjust Fee</span>
+                                </div>
+                             ) : (
+                                <span className="font-black text-gray-900">{fmt(t.amount)}</span>
+                             )}
                          </label>
                       ))}
                    </div>

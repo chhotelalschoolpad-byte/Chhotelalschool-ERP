@@ -210,19 +210,38 @@ export default function ReceiptPDF({ payment, student, settings }) {
   };
 
   // Build Table Rows
-  let finalRows = [...rawItems];
+  let finalRows = [];
+  rawItems.forEach(item => {
+    if (item.months && Array.isArray(item.months) && item.months.length > 0) {
+      item.months.forEach(mName => {
+        finalRows.push({
+          type: item.type,
+          monthName: mName,
+          amount: item.rate,
+          isExpanded: true
+        });
+      });
+    } else {
+      finalRows.push({
+        type: item.type,
+        monthName: '—',
+        amount: item.total || item.amount || 0,
+        isExpanded: false
+      });
+    }
+  });
+
   if (Number(previousDueCleared) > 0) {
-    finalRows.push({ type: 'Legacy Balance Cleared', amount: Number(previousDueCleared) });
+    finalRows.push({ type: 'Legacy Balance Cleared', monthName: '—', amount: Number(previousDueCleared) });
   }
 
   // Final Fallback if empty
   if (finalRows.length === 0) {
-    finalRows.push({ type: 'FEE PAYMENT', amount: Number(totalPaidAmt) + Number(discount) });
+    finalRows.push({ type: 'FEE PAYMENT', monthName: '—', amount: Number(totalPaidAmt) + Number(discount) });
   }
 
   // Identification Logic
-  const monthlyRowIdx = finalRows.findIndex(r => r.type?.toLowerCase().includes('monthly'));
-  const topRowIdx = monthlyRowIdx !== -1 ? monthlyRowIdx : 0;
+  const topRowIdx = 0;
   
   // Calculate remaining balance strictly
   const remainDue = Math.max(0, Number(previousDue) - Number(previousDuePaid));
@@ -234,7 +253,7 @@ export default function ReceiptPDF({ payment, student, settings }) {
           <View style={styles.innerPageBorder}>
             
             <View style={styles.header}>
-              <View style={styles.logoBox}><Image src={logo} style={styles.logo} /></View>
+              <Image src={logo} style={styles.logo} />
               <View style={styles.schoolInfo}>
                 <Text style={styles.schoolName}>{schoolName}</Text>
                 <Text style={styles.address}>{schoolAddress}</Text>
@@ -242,55 +261,55 @@ export default function ReceiptPDF({ payment, student, settings }) {
                 <Text style={styles.sessionLabel}>SESSION : ({sessionStr})</Text>
               </View>
             </View>
-
-            <Text style={styles.receiptTitle}>Fee Receipt({sessionStr})</Text>
-
-            {/* Info Grid */}
-             <View style={styles.infoRow}>
-                <View style={styles.infoCell}><Text style={styles.labelNormal}>Receipt No :</Text><Text style={styles.value}>{receiptNumber}</Text></View>
-                <View style={styles.infoCellLast}><Text style={styles.labelNormal}>Date :</Text><Text style={styles.value}>{printDate}</Text></View>
-             </View>
-             <View style={styles.infoRow}>
-                <View style={styles.infoCell}><Text style={styles.label}>Name :</Text><Text style={styles.value}>{fullName.toUpperCase()}</Text></View>
-                <View style={styles.infoCellLast}><Text style={styles.label}>Class :</Text><Text style={styles.value}>{className}</Text></View>
-             </View>
-             <View style={styles.infoRow}>
-                <View style={styles.infoCell}><Text style={styles.label}>Adm No :</Text><Text style={styles.value}>{admissionNumber}</Text></View>
-                <View style={styles.infoCellLast}><Text style={styles.label}>{"Mother's Name :"}</Text><Text style={styles.value}>{motherName?.toUpperCase() || '--'}</Text></View>
-             </View>
-             <View style={[styles.infoRow, { borderBottomWidth: 1 }]}>
-                <View style={styles.infoCell}><Text style={styles.label}>{"Father's Name :"}</Text><Text style={styles.value}>{fatherName.toUpperCase() || '--'}</Text></View>
-                <View style={styles.infoCellLast}><Text style={styles.label}>Phone Number :</Text><Text style={styles.value}>{mobile1 || '--'}</Text></View>
-             </View>
-
-            {/* Table */}
-            <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.th, styles.colSno]}>Sno</Text>
-                <Text style={[styles.th, styles.colParticulars]}>Particulars</Text>
-                <Text style={[styles.th, styles.colMonth]}>Month</Text>
-                <Text style={[styles.th, styles.colPayable]}>Payable</Text>
-                <Text style={[styles.th, styles.colDiscount]}>Discount</Text>
-                <Text style={[styles.th, styles.colPaid]}>Paid</Text>
-                <Text style={[styles.th, styles.thLast, styles.colDue]}>Due</Text>
+ 
+             <Text style={styles.receiptTitle}>Fee Receipt({sessionStr})</Text>
+ 
+             {/* Info Grid */}
+              <View style={styles.infoRow}>
+                 <View style={styles.infoCell}><Text style={styles.labelNormal}>Receipt No :</Text><Text style={styles.value}>{receiptNumber}</Text></View>
+                 <View style={styles.infoCellLast}><Text style={styles.labelNormal}>Date :</Text><Text style={styles.value}>{printDate}</Text></View>
               </View>
-
-              {finalRows.map((item, i) => {
-                 const isMo = item.type?.toLowerCase().includes('monthly');
-                 const itemD = isMo ? Number(discount) : 0;
-                 const isFirst = (i === topRowIdx);
-                 return (
-                  <View key={i} style={styles.tr}>
-                    <Text style={[styles.td, styles.colSno]}>{i + 1}</Text>
-                    <Text style={[styles.td, styles.colParticulars]}>{item.type?.toUpperCase() || 'FEE PAYMENT'}</Text>
-                    <Text style={[styles.td, styles.colMonth]}>{isMo ? formatMonthLabel(payMonth) : '—'}</Text>
-                    <Text style={[styles.td, styles.colPayable]}>{Math.round(item.amount + itemD)}</Text>
-                    <Text style={[styles.td, styles.colDiscount]}>{Math.round(itemD)}</Text>
-                    <Text style={[styles.td, styles.colPaid]}>{Math.round(item.amount)}</Text>
-                    <Text style={[styles.td, styles.tdLast, styles.colDue]}>{isFirst && remainDue > 0 ? Math.round(remainDue) : '—'}</Text>
-                  </View>
-                 );
-              })}
+              <View style={styles.infoRow}>
+                 <View style={styles.infoCell}><Text style={styles.label}>Name :</Text><Text style={styles.value}>{fullName.toUpperCase()}</Text></View>
+                 <View style={styles.infoCellLast}><Text style={styles.label}>Class :</Text><Text style={styles.value}>{className}</Text></View>
+              </View>
+              <View style={styles.infoRow}>
+                 <View style={styles.infoCell}><Text style={styles.label}>Adm No :</Text><Text style={styles.value}>{admissionNumber}</Text></View>
+                 <View style={styles.infoCellLast}><Text style={styles.label}>{"Mother's Name :"}</Text><Text style={styles.value}>{motherName?.toUpperCase() || '--'}</Text></View>
+              </View>
+              <View style={[styles.infoRow, { borderBottomWidth: 1 }]}>
+                 <View style={styles.infoCell}><Text style={styles.label}>{"Father's Name :"}</Text><Text style={styles.value}>{fatherName.toUpperCase() || '--'}</Text></View>
+                 <View style={styles.infoCellLast}><Text style={styles.label}>Phone Number :</Text><Text style={styles.value}>{mobile1 || '--'}</Text></View>
+              </View>
+ 
+             {/* Table */}
+             <View style={styles.table}>
+               <View style={styles.tableHeader}>
+                 <Text style={[styles.th, styles.colSno]}>Sno</Text>
+                 <Text style={[styles.th, styles.colParticulars]}>Particulars</Text>
+                 <Text style={[styles.th, styles.colMonth]}>Month</Text>
+                 <Text style={[styles.th, styles.colPayable]}>Payable</Text>
+                 <Text style={[styles.th, styles.colDiscount]}>Discount</Text>
+                 <Text style={[styles.th, styles.colPaid]}>Paid</Text>
+                 <Text style={[styles.th, styles.thLast, styles.colDue]}>Due</Text>
+               </View>
+ 
+               {finalRows.map((item, i) => {
+                  const isMo = item.type?.toLowerCase().includes('monthly');
+                  const isFirst = (i === topRowIdx);
+                  const itemD = isFirst ? Number(discount) : 0;
+                  return (
+                   <View key={i} style={styles.tr}>
+                     <Text style={[styles.td, styles.colSno]}>{i + 1}</Text>
+                     <Text style={[styles.td, styles.colParticulars]}>{item.type?.toUpperCase() || 'FEE PAYMENT'}</Text>
+                     <Text style={[styles.td, styles.colMonth]}>{item.monthName || (isMo ? formatMonthLabel(payMonth) : '—')}</Text>
+                     <Text style={[styles.td, styles.colPayable]}>{Math.round(item.amount + itemD)}</Text>
+                     <Text style={[styles.td, styles.colDiscount]}>{Math.round(itemD)}</Text>
+                     <Text style={[styles.td, styles.colPaid]}>{Math.round(item.amount)}</Text>
+                     <Text style={[styles.td, styles.tdLast, styles.colDue]}>{isFirst && remainDue > 0 ? Math.round(remainDue) : '—'}</Text>
+                   </View>
+                  );
+               })}
 
               {/* Total Footer Row */}
               <View style={[styles.tr, styles.totalRow]}>

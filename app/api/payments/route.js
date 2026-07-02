@@ -3,15 +3,19 @@ import { withAuth } from '@/lib/middleware';
 import { generateReceiptNumber } from '@/lib/receipt';
 import { createPaymentSchema } from '@/validations/paymentSchemas';
 
-/**
- * POST /api/payments
- * 
- * Simplified payment recording logic:
- * 1. Validates input (Zod)
- * 2. Checks for duplicate monthly payments for the same month
- * 3. Atomic transaction: updates student legacy balance + creates payment record
- * 4. Server-side receipt number generation
- */
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+function isFutureSession(monthName, year) {
+  const now = new Date();
+  const currentSessionStartYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const monthIndex = monthNames.indexOf(monthName);
+  const sessionYear = monthIndex >= 3 ? year : year - 1;
+  return sessionYear > currentSessionStartYear;
+}
+
 export async function POST(req) {
   try {
     const authResult = await withAuth(req, ['ADMIN', 'MANAGER']);
@@ -27,33 +31,106 @@ export async function POST(req) {
 
     const { 
       studentId, 
-      month, 
+      month: initialMonth, 
+      months, 
       paymentMode, 
       discount, 
       previousDueAmount, 
+      paymentItems,
       selectedItems 
     } = result.data;
 
-    // Standardize "Monthly Fee" check
-    const isMonthlyPaid = selectedItems.some(
-      i => i.type.toLowerCase().includes('monthly')
-    );
+    // 1. Normalize Inputs (Bridge old style requests)
+    let finalPaymentItems = paymentItems;
+    let finalMonths = months;
 
-    // 1. Duplicate Monthly Guard
-    if (isMonthlyPaid) {
-      const existing = await prisma.payment.findFirst({
-        where: { studentId, month, isMonthlyPaid: true }
+    if (paymentItems.length === 0 && selectedItems && selectedItems.length > 0) {
+      finalPaymentItems = selectedItems.map(i => {
+        const isMonthly = i.type.toLowerCase().includes('monthly');
+        const isTransport = i.type.toLowerCase().includes('transport') || i.type.toLowerCase().includes('van');
+        let qty = 1;
+        let rate = i.amount;
+        let itemMonths = undefined;
+
+        if (isMonthly && initialMonth) {
+          const [y, m] = initialMonth.split('-').map(Number);
+          if (y && m) {
+            const mName = monthNames[m - 1];
+            itemMonths = [mName];
+            finalMonths = [{ month: mName, year: y }];
+          }
+        }
+
+        return {
+          type: isMonthly ? 'MONTHLY' : (isTransport ? 'TRANSPORT' : i.type.toUpperCase()),
+          months: itemMonths,
+          rate: rate,
+          quantity: qty,
+          total: rate * qty
+        };
       });
-      if (existing) {
-        return Response.json({ 
-          error: `Monthly fee for ${month} is already recorded.` 
-        }, { status: 409 });
+    }
+
+    // 2. Validate Selected Months
+    if (finalMonths && finalMonths.length > 0) {
+      const seen = new Set();
+      for (const m of finalMonths) {
+        const key = `${m.year}-${m.month}`;
+        if (seen.has(key)) {
+          return Response.json({ error: `Duplicate month selected: ${m.month} ${m.year}` }, { status: 400 });
+        }
+        seen.add(key);
+
+        if (isFutureSession(m.month, m.year)) {
+          return Response.json({ error: `Cannot pay for future academic session month: ${m.month} ${m.year}` }, { status: 400 });
+        }
+      }
+
+      // Check against existing paid months in database
+      const existingPayments = await prisma.payment.findMany({
+        where: { studentId, status: 'SUCCESS' }
+      });
+
+      for (const m of finalMonths) {
+        const monthIndex = monthNames.indexOf(m.month) + 1;
+        const monthStr = String(monthIndex).padStart(2, '0');
+        const ym = `${m.year}-${monthStr}`;
+
+        const alreadyPaid = existingPayments.some(p => {
+          if (!p.isMonthlyPaid) return false;
+          if (p.month === ym) return true;
+          if (p.selectedMonths && Array.isArray(p.selectedMonths)) {
+            return p.selectedMonths.some(sm => sm.month === m.month && sm.year === m.year);
+          }
+          return false;
+        });
+
+        if (alreadyPaid) {
+          return Response.json({ error: `Monthly fee for ${m.month} ${m.year} is already paid.` }, { status: 409 });
+        }
       }
     }
 
-    // 2. Atomic Transaction
+    // 3. Server-side Calculations & Math Verification
+    for (const item of finalPaymentItems) {
+      const expectedTotal = item.rate * item.quantity;
+      if (item.total !== expectedTotal) {
+        return Response.json({ 
+          error: `Calculation mismatch for ${item.type}: rate ${item.rate} * quantity ${item.quantity} = ${expectedTotal}, but got ${item.total}` 
+        }, { status: 400 });
+      }
+    }
+
+    const baseAmount = finalPaymentItems.reduce((sum, item) => sum + item.total, 0) + previousDueAmount;
+    if (discount > baseAmount) {
+      return Response.json({ error: "Discount cannot be greater than the total payable amount." }, { status: 400 });
+    }
+    const finalTotal = Math.max(0, baseAmount - discount);
+
+    const isMonthlyPaid = finalPaymentItems.some(i => i.type.toUpperCase() === 'MONTHLY');
+
+    // 4. Save to Database
     const finalResult = await prisma.$transaction(async (tx) => {
-      // Fetch student for balance and validation
       const student = await tx.student.findUnique({
         where: { id: studentId },
         select: { 
@@ -68,9 +145,7 @@ export async function POST(req) {
         throw { status: 404, message: 'Student not found' };
       }
 
-      const now = new Date();
-      const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
+      // Legacy Due Clearance
       let actualClearing = 0;
       if (previousDueAmount > 0) {
         const remainingToClear = Math.max(0, student.previousDue - student.previousDuePaid);
@@ -85,29 +160,34 @@ export async function POST(req) {
         }
       });
 
+      // Receipt number & Month YM generation
       const receiptNumber = await generateReceiptNumber(tx);
-      const baseAmount = selectedItems.reduce((sum, i) => sum + i.amount, 0) + previousDueAmount;
-      const total = Math.max(0, baseAmount - discount);
+      let legacyMonthVal = initialMonth || "";
+      if (finalMonths && finalMonths.length > 0) {
+        const firstM = finalMonths[0];
+        const monthIndex = monthNames.indexOf(firstM.month) + 1;
+        legacyMonthVal = `${firstM.year}-${String(monthIndex).padStart(2, '0')}`;
+      }
 
-      // Create Payment Record
       const payment = await tx.payment.create({
         data: {
           studentId,
           admissionNumber: student.admissionNumber,
-          month,
-          amount: total,
+          month: legacyMonthVal,
+          selectedMonths: finalMonths.length > 0 ? finalMonths : null,
+          amount: finalTotal,
           discount,
           paymentMode,
           receiptNumber,
           recordedBy: authResult.user.username,
-          paymentItems: selectedItems,
+          paymentItems: finalPaymentItems,
           isMonthlyPaid,
           previousDueCleared: actualClearing,
           status: 'SUCCESS'
         }
       });
 
-      return { payment, receiptNumber, total };
+      return { payment, receiptNumber, total: finalTotal };
     });
 
     return Response.json({ 

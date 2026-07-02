@@ -16,6 +16,49 @@ function formatMonthLabel(ym) {
   return new Date(parseInt(y), parseInt(m) - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
 }
 
+function formatMonthsRange(payment) {
+  if (payment.selectedMonths && Array.isArray(payment.selectedMonths) && payment.selectedMonths.length > 0) {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const items = payment.selectedMonths.map(m => {
+      const idx = monthNames.indexOf(m.month);
+      return {
+        month: m.month,
+        year: m.year,
+        absIdx: m.year * 12 + idx
+      };
+    }).sort((a, b) => a.absIdx - b.absIdx);
+
+    const ranges = [];
+    let start = items[0];
+    let prev = items[0];
+
+    for (let i = 1; i < items.length; i++) {
+      const curr = items[i];
+      if (curr.absIdx === prev.absIdx + 1) {
+        prev = curr;
+      } else {
+        if (start.absIdx === prev.absIdx) {
+          ranges.push(start.month);
+        } else {
+          ranges.push(`${start.month}-${prev.month}`);
+        }
+        start = curr;
+        prev = curr;
+      }
+    }
+
+    if (start.absIdx === prev.absIdx) {
+      ranges.push(start.month);
+    } else {
+      ranges.push(`${start.month}-${prev.month}`);
+    }
+
+    return ranges.join(', ');
+  }
+
+  return payment.month ? formatMonthLabel(payment.month) : 'Onetime';
+}
+
 const fetcher = url => fetch(url).then(r => r.json());
 
 export default function ReportsPage() {
@@ -238,7 +281,7 @@ export default function ReportsPage() {
                           <td className="px-4 py-1.5 font-mono text-[11px] text-gray-400 tracking-tighter">{p.receiptNumber}</td>
                           <td className="px-4 py-1.5 font-bold text-gray-900">{p.student?.fullName}</td>
                           <td className="px-4 py-1.5 text-gray-400 text-[11px]">{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                          <td className="px-4 py-1.5 font-medium text-blue-600/70 text-[11px] uppercase">{formatMonthLabel(p.month)}</td>
+                          <td className="px-4 py-1.5 font-medium text-blue-600/70 text-[11px] uppercase">{formatMonthsRange(p)}</td>
                           <td className="px-4 py-1.5 text-gray-600 font-medium text-right whitespace-nowrap">{formatIN(p.amount)}</td>
                           <td className="px-4 py-1.5 text-amber-600 font-medium text-right whitespace-nowrap">{p.discount > 0 ? formatIN(p.discount) : '-'}</td>
                           <td className="px-4 py-1.5 text-emerald-600 font-medium text-right whitespace-nowrap">+{formatIN(p.amount - p.discount)}</td>

@@ -31,6 +31,49 @@ function formatMonthLabel(ym) {
   return new Date(parseInt(y), parseInt(m) - 1).toLocaleString("en-IN", { month: "long", year: "numeric" });
 }
 
+function formatMonthsRange(payment) {
+  if (payment.selectedMonths && Array.isArray(payment.selectedMonths) && payment.selectedMonths.length > 0) {
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const items = payment.selectedMonths.map(m => {
+      const idx = monthNames.indexOf(m.month);
+      return {
+        month: m.month,
+        year: m.year,
+        absIdx: m.year * 12 + idx
+      };
+    }).sort((a, b) => a.absIdx - b.absIdx);
+
+    const ranges = [];
+    let start = items[0];
+    let prev = items[0];
+
+    for (let i = 1; i < items.length; i++) {
+      const curr = items[i];
+      if (curr.absIdx === prev.absIdx + 1) {
+        prev = curr;
+      } else {
+        if (start.absIdx === prev.absIdx) {
+          ranges.push(start.month);
+        } else {
+          ranges.push(`${start.month}-${prev.month}`);
+        }
+        start = curr;
+        prev = curr;
+      }
+    }
+
+    if (start.absIdx === prev.absIdx) {
+      ranges.push(start.month);
+    } else {
+      ranges.push(`${start.month}-${prev.month}`);
+    }
+
+    return ranges.join(', ');
+  }
+
+  return payment.month ? formatMonthLabel(payment.month) : 'Onetime';
+}
+
 const getJoiningYear = (admissionNumber) => {
   if (!admissionNumber) return new Date().getFullYear();
   const parts = admissionNumber.split("-");
@@ -209,8 +252,22 @@ export default function StudentProfile() {
       const calYear = monthNum >= 4 ? selectedSession : selectedSession + 1;
       const curr = new Date(calYear, monthNum - 1, 1);
 
-      const monthPayments = payments.filter(p => p.month === ym);
-      const isPaid = monthPayments.some(p => p.isMonthlyPaid && p.status === 'SUCCESS');
+      const isPaid = payments.some(p => {
+        if (p.status !== 'SUCCESS') return false;
+        if (p.month === ym && p.isMonthlyPaid) return true;
+        if (p.selectedMonths && Array.isArray(p.selectedMonths) && p.isMonthlyPaid) {
+          const [yStr, mStr] = ym.split('-');
+          const yearNum = parseInt(yStr, 10);
+          const monthIndex = parseInt(mStr, 10);
+          const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          const monthName = monthNames[monthIndex - 1];
+          return p.selectedMonths.some(sm => 
+            sm.year === yearNum && 
+            (sm.month === monthName || sm.month === mStr || String(sm.month).padStart(2, '0') === mStr)
+          );
+        }
+        return false;
+      });
       const isPast = curr < currentMonthStart;
       const isFuture = curr > currentMonthStart;
 
@@ -556,79 +613,75 @@ export default function StudentProfile() {
               </p>
             </div>
 
-            <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-100">
-                  <tr>
-                    <th className="px-8 py-5 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest">Receipt ID</th>
-                    <th className="px-8 py-5 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest">Student</th>
-                    <th className="px-8 py-5 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Date Paid</th>
-                    <th className="px-8 py-5 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Target</th>
-                    <th className="px-8 py-5 text-right text-[10px] font-black uppercase text-gray-400 tracking-widest">Amount</th>
-                    <th className="px-8 py-5 text-center text-[10px] font-black uppercase text-gray-400 tracking-widest">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredPayments.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="px-8 py-12 text-center text-gray-400 italic font-medium">No records available for this student.</td>
-                    </tr>
-                  )}
-                  {filteredPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).map(p => (
-                    <tr key={p.id} className="group hover:bg-gray-50/50 transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center font-medium text-[10px]">
-                            {p.paymentMode.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-mono text-gray-400 text-[11px] tracking-tighter">{p.receiptNumber}</p>
-                            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-tight">{p.paymentMode}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <p className="font-bold text-gray-900 text-sm">{student.fullName}</p>
-                      </td>
-                      <td className="px-8 py-5 text-center">
-                        <p className="text-xs text-gray-500 font-medium">{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                      </td>
-                      <td className="px-8 py-5 text-center">
-                        {p.month ? (
-                          <span className="inline-block bg-blue-50 text-blue-700 px-3 py-1 rounded-xl text-[10px] font-medium uppercase tracking-tight border border-blue-100 shadow-sm shadow-blue-50">
-                            {formatMonthLabel(p.month)}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-gray-400 uppercase italic">Onetime</span>
-                        )}
-                      </td>
-                      <td className="px-8 py-5 text-right whitespace-nowrap">
-                        <p className="text-sm font-medium text-emerald-600">+{fmt(p.amount)}</p>
-                        {p.discount > 0 && <p className="text-[9px] font-bold text-emerald-600/60">discount:{fmt(p.discount)}</p>}
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center justify-center gap-2">
-                          <PDFDownloadLink document={<ReceiptPDF payment={p} student={student} settings={settings} />} fileName={`Receipt_${p.receiptNumber}.pdf`}>
-                            <button className="h-9 w-9 bg-gray-50 hover:bg-blue-600 hover:text-white rounded-xl text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm">
-                              <Download size={16} />
-                            </button>
-                          </PDFDownloadLink>
-                          {canArchive && (
-                            <button
-                              onClick={() => setPaymentToArchive(p.id)}
-                              className="h-9 w-9 bg-gray-50 hover:bg-red-500 hover:text-white rounded-xl text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+             <div className="overflow-x-auto">
+               <table className="w-full border-collapse">
+                 <thead className="bg-gray-50 sticky top-0 z-10 border-b border-gray-100">
+                   <tr>
+                     <th className="px-4 py-2 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Receipt ID</th>
+                     <th className="px-4 py-2 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Student</th>
+                     <th className="px-4 py-2 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest text-center border-b border-gray-100">Date Paid</th>
+                     <th className="px-4 py-2 text-left text-[10px] font-black uppercase text-gray-400 tracking-widest text-center border-b border-gray-100">Target</th>
+                     <th className="px-4 py-2 text-right text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Amount</th>
+                     <th className="px-4 py-2 text-center text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100">Action</th>
+                   </tr>
+                 </thead>
+                 <tbody className="divide-y divide-gray-50">
+                   {filteredPayments.length === 0 && (
+                     <tr>
+                       <td colSpan="6" className="px-4 py-6 text-center text-gray-400 italic font-medium">No records available for this student.</td>
+                     </tr>
+                   )}
+                   {filteredPayments.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)).map(p => (
+                     <tr key={p.id} className="group hover:bg-gray-50/50 transition-colors">
+                       <td className="px-4 py-2 border-b border-gray-50">
+                         <div className="flex items-center gap-2">
+                           <div className="h-6 w-6 bg-blue-50 text-blue-600 rounded flex items-center justify-center font-bold text-[9px] shrink-0">
+                             {p.paymentMode.charAt(0)}
+                           </div>
+                           <div>
+                             <p className="font-mono text-gray-800 text-[10px] font-bold tracking-tighter leading-none">{p.receiptNumber}</p>
+                             <p className="text-[8px] font-black text-gray-400 uppercase tracking-tight leading-none mt-0.5">{p.paymentMode}</p>
+                           </div>
+                         </div>
+                       </td>
+                       <td className="px-4 py-2 border-b border-gray-50">
+                         <p className="font-bold text-gray-900 text-xs">{student.fullName}</p>
+                       </td>
+                       <td className="px-4 py-2 text-center border-b border-gray-50">
+                         <p className="text-[10px] text-gray-500 font-bold">{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                       </td>
+                       <td className="px-4 py-2 text-center border-b border-gray-50">
+                         <span className="inline-block bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-tight border border-blue-100">
+                           {formatMonthsRange(p)}
+                         </span>
+                       </td>
+                       <td className="px-4 py-2 text-right whitespace-nowrap border-b border-gray-50">
+                         <p className="text-xs font-black text-emerald-600">+{fmt(p.amount)}</p>
+                         {p.discount > 0 && <p className="text-[8px] font-black text-emerald-600/50">discount: {fmt(p.discount)}</p>}
+                       </td>
+                       <td className="px-4 py-2 border-b border-gray-50">
+                         <div className="flex items-center justify-center gap-1.5">
+                           <PDFDownloadLink document={<ReceiptPDF payment={p} student={student} settings={settings} />} fileName={`Receipt_${p.receiptNumber}.pdf`}>
+                             <button className="h-6 w-6 bg-gray-50 hover:bg-blue-600 hover:text-white rounded text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm">
+                               <Download size={12} />
+                             </button>
+                           </PDFDownloadLink>
+                           {canArchive && (
+                             <button
+                               onClick={() => setPaymentToArchive(p.id)}
+                               className="h-6 w-6 bg-gray-50 hover:bg-red-500 hover:text-white rounded text-gray-400 transition-all flex items-center justify-center border border-gray-100 shadow-sm"
+                             >
+                               <Trash2 size={12} />
+                             </button>
+                           )}
+                         </div>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             </div>
+           </div>
         </div>
 
         {/* RIGHT COLUMN: SUMMARY CARDS & BIO */}
